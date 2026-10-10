@@ -140,6 +140,19 @@ export function metroEvents(previous, current) {
  * @returns {string[]} values of BIXI_EVENTS
  */
 export function bixiStationEvents(previous, current) {
+  // A station leaving the feed (removed for the winter) is one event, not
+  // three: it reads as 0 bikes and 0 docks too, and "no bike left" plus "no
+  // free dock" on top of "out of service" would run three scenes for one
+  // fact. Its return is likewise one "back in service".
+  if (current.absent && !previous.absent) {
+    return previous.installed === false ? [] : [BIXI_EVENTS.OUT_OF_SERVICE];
+  }
+  if (previous.absent && !current.absent) {
+    return current.installed === false ? [] : [BIXI_EVENTS.BACK_IN_SERVICE];
+  }
+  if (current.absent) {
+    return [];
+  }
   const events = [];
   if (isCount(previous.bikes) && isCount(current.bikes)) {
     if (previous.bikes > 0 && current.bikes === 0) events.push(BIXI_EVENTS.NO_BIKE);

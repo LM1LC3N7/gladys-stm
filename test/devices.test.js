@@ -29,6 +29,9 @@ import { clearBixiCache } from '../src/api/bixi.js';
 import { ETAT_SERVICE_PATH } from '../src/api/metro.js';
 import { clearTransitousCache } from '../src/api/transitous.js';
 import { clearSuggestions } from '../src/devices/suggestions.js';
+import { ABSENT_POLL_SECONDS, clearAbsentStations } from '../src/devices/bixiStation.js';
+import { DISCOVERY, INFORMATION, STATUS } from './helpers/fixtures.js';
+import { BIXI_GBFS_URL } from '../src/api/bixi.js';
 import { GEOCODE, stopTimesPayload } from './helpers/fixtures.js';
 
 const config = normalizeConfig({
@@ -71,6 +74,7 @@ beforeEach(() => {
   clearBixiCache();
   clearTransitousCache();
   clearSuggestions();
+  clearAbsentStations();
 });
 afterEach(() => restoreFetch());
 
@@ -321,4 +325,63 @@ test('search_stops explains an unavailable directory instead of failing', async 
     config,
   });
   assert.match(message.en, /does not answer right now/);
+});
+
+// --- BIXI stations removed for the winter ------------------------------------
+
+/** The BIXI routes, with station 1 present or removed from both files. */
+function bixiWith({ station1 }) {
+  const keep = (stations) => stations.filter((station) => station1 || station.station_id !== '1');
+  return {
+    [BIXI_GBFS_URL]: DISCOVERY,
+    'fr/station_information.json': { data: { stations: keep(INFORMATION.data.stations) } },
+    'fr/station_status.json': { data: { stations: keep(STATUS.data.stations) } },
+  };
+}
+
+test('a station removed from the feed shows as removed, flagged, and read every 15 minutes', async () => {
+  const gladys = createFakeGladys();
+  const device = { external_id: 'bixi-station:1' };
+  const [blueprint] = buildBlueprints(
+    gladys,
+    normalizeConfig({ bixi_stations: '1', watch_metro: false }),
+  );
+  const bixiConfig = normalizeConfig({ bixi_stations: '1', watch_metro: false });
+
+  stubFetch(bixiWith({ station1: true }));
+  await pollDevice(gladys, device, bixiConfig);
+  assert.deepEqual(gladys.transports.at(-1), { external_id: 'bixi-station:1', transport: 'cloud' });
+
+  restoreFetch();
+  clearBixiCache();
+  clearPollSchedule();
+  stubFetch(bixiWith({ station1: false }));
+  await pollDevice(gladys, device, bixiConfig);
+
+  const latest = (key) =>
+    gladys.published.filter((state) => state.featureExternalId === `bixi-station:1:${key}`).at(-1);
+  assert.equal(latest('bikes').state, 0);
+  assert.equal(latest('docks').state, 0);
+  assert.equal(latest('status').text, 'Retirée du réseau BIXI (saisonnier ?)');
+  assert.equal(gladys.transports.at(-1).degraded, true);
+  assert.match(gladys.transports.at(-1).message.fr, /retirée pour l’hiver/);
+  assert.equal(blueprint.pollIntervalMs(bixiConfig), ABSENT_POLL_SECONDS * 1000);
+  // One event for the removal, not "no bike" and "no dock" on top of it.
+  assert.deepEqual(
+    gladys.sceneEvents.map((event) => event.data.event),
+    ['out_of_service'],
+  );
+
+  // Back in the spring: one event, the badge cleared, the usual interval.
+  restoreFetch();
+  clearBixiCache();
+  clearPollSchedule();
+  stubFetch(bixiWith({ station1: true }));
+  await pollDevice(gladys, device, bixiConfig);
+  assert.deepEqual(
+    gladys.sceneEvents.map((event) => event.data.event),
+    ['out_of_service', 'back_in_service'],
+  );
+  assert.deepEqual(gladys.transports.at(-1), { external_id: 'bixi-station:1', transport: 'cloud' });
+  assert.equal(blueprint.pollIntervalMs(bixiConfig), bixiConfig.bixi_poll_frequency * 1000);
 });

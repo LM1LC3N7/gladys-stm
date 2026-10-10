@@ -122,6 +122,13 @@ no real-time train times: only the line status is available.
 **BIXI station:** the bikes (e-bikes included), the e-bikes, the free docks
 and the state of the station.
 
+Part of the BIXI stations are removed every winter. A station that leaves the
+network shows 0 bikes, 0 docks and the state "Removed from the BIXI network
+(seasonal?)", with an orange dot on the device. The "Out of service" trigger
+fires once, then "Back in service" when the station returns in the spring.
+There is nothing to do: the device resumes by itself. While it is away, the
+station is only checked every 15 minutes.
+
 ## Scenes
 
 **Triggers:**
@@ -143,14 +150,15 @@ and the state of the station.
 
 ## Troubleshooting
 
-| Message or symptom                                | What to do                                                                                             |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| "set the address of your house"                   | _Settings → Houses_: place the house on the map, then save the configuration of the integration again. |
-| "Gladys did not share the location of your house" | Reinstall the integration and accept the location access, or type stop codes.                          |
-| Nothing in the Discover tab                       | Read the message of the configuration page: it says what is missing.                                   |
-| "The STM refused the API key"                     | Check the key, and that the application is subscribed to both APIs (GTFS-realtime and i3).             |
-| "Quota used up"                                   | Raise the intervals (Advanced section), or check no other application uses the same STM account.       |
-| A stop stays at 999                               | No bus scheduled (at night), or a route filter matching no route of the stop.                          |
+| Message or symptom                                | What to do                                                                                                                              |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| "set the address of your house"                   | _Settings → Houses_: place the house on the map, then save the configuration of the integration again.                                  |
+| "Gladys did not share the location of your house" | Reinstall the integration and accept the location access, or type stop codes.                                                           |
+| Nothing in the Discover tab                       | Read the message of the configuration page: it says what is missing.                                                                    |
+| "The STM refused the API key"                     | Check the key, and that the application is subscribed to both APIs (GTFS-realtime and i3).                                              |
+| "Quota used up"                                   | Raise the intervals (Advanced section), or check no other application uses the same STM account.                                        |
+| BIXI station "Removed from the BIXI network"      | The station left the BIXI network, often for the winter: it will come back by itself. To follow another one, see "Find a BIXI station". |
+| A stop stays at 999                               | No bus scheduled (at night), or a route filter matching no route of the stop.                                                           |
 
 ## Privacy, data and licences
 

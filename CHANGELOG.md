@@ -16,6 +16,11 @@ the notes of the version's GitHub Release.
   the two kinds are easy to tell apart in the Discover tab and the device
   list. Devices already added keep their name: rename them in Gladys, or
   delete and add them again.
+- A BIXI station missing from the network feed (removed for the winter) is
+  shown as removed: 0 bikes, 0 docks, a "Removed from the BIXI network" state,
+  an orange dot on the device, one "out of service" scene event (one "back in
+  service" when it returns), and a read every 15 minutes instead of an error
+  every minute. It used to keep its last values all winter.
 - GitHub Actions updated (checkout 7, setup-node 7, Docker actions), and
   Dependabot now groups the action updates in a single pull request.
 

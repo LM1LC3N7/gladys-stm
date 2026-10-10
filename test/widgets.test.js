@@ -15,7 +15,8 @@ import { normalizeConfig } from '../src/config.js';
 import { clearReadings } from '../src/devices/readings.js';
 import { clearStmCache, TRIP_UPDATES_PATH } from '../src/api/stm.js';
 import { clearBixiCache } from '../src/api/bixi.js';
-import { departuresContent } from '../src/widgets/index.js';
+import { bixiStationContent, departuresContent } from '../src/widgets/index.js';
+import { absentStation } from '../src/api/bixi.js';
 import { ETAT_SERVICE_PATH } from '../src/api/metro.js';
 import { truncate, WIDGETS } from '../src/widgets/index.js';
 
@@ -151,4 +152,14 @@ test('an empty board says so', () => {
   const content = departuresContent('Arrêt', []);
   assertValid(content);
   assert.match(content.components[1].text.fr, /Aucun passage/);
+});
+
+test('a removed BIXI station gets a card that says so, not three zeros', () => {
+  const content = bixiStationContent('BIXI – Peel / Notre-Dame', absentStation('974'));
+  assertValid(content);
+  assert.equal(
+    content.components.some((component) => component.type === 'value'),
+    false,
+  );
+  assert.match(content.components[1].text.fr, /retirée pour l’hiver/);
 });

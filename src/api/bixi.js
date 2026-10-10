@@ -205,10 +205,38 @@ export function mergeStations(information, status) {
 export async function fetchStation(config, station, options) {
   const stations = await fetchStations(config, options);
   const found = stations.get(station.id);
-  if (!found) {
-    throw new BixiError(`BIXI station ${station.id} is not in the network feed`);
+  if (found) {
+    return found;
   }
-  return found;
+  if (stations.size === 0) {
+    // An empty network is a broken feed, not every station removed at once.
+    throw new BixiError('The BIXI network feed lists no station');
+  }
+  // A station missing from a feed that lists the others is a station BIXI
+  // took away: for the winter (part of the network is removed every year),
+  // for roadworks, or for good. That is a state of the station, not a failed
+  // read: it holds no bike and no free dock, and it says why.
+  return absentStation(station.id);
+}
+
+/**
+ * What a station missing from the network feed is: nothing to rent, nothing to
+ * return, and flagged `absent` so that the device, the widget and the scene
+ * triggers can say "removed" rather than "out of service".
+ * @param {string} id
+ */
+export function absentStation(id) {
+  return {
+    id,
+    name: knownStationName(id) ?? id,
+    bikes: 0,
+    electricBikes: 0,
+    docks: 0,
+    installed: false,
+    renting: false,
+    returning: false,
+    absent: true,
+  };
 }
 
 /**

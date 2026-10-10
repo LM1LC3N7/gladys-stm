@@ -18,6 +18,7 @@ import {
   createLogger,
   DEVICE_FEATURE_CATEGORIES,
   DEVICE_FEATURE_TYPES,
+  DEVICE_TRANSPORTS,
 } from '@gladysassistant/integration-sdk';
 import { gladysPollFrequency } from '../config.js';
 import { TEXT_FEATURE_RANGE } from './featureRange.js';
@@ -61,8 +62,30 @@ const LABELS = {
   },
 };
 
+// A station absent from the feed is read every quarter of an hour, not every
+// two minutes: it comes back with the season, not within the minute, and a
+// device left in Gladys all winter must not read the network for nothing.
+export const ABSENT_POLL_SECONDS = 15 * 60;
+
+/** The stations currently absent from the feed, by id. */
+const absentStations = new Set();
+/**
+ * The stations whose badge this process has already published. The first read
+ * of a station after a (re)start always publishes it: a station that came
+ * back while the container was stopped must not keep the orange dot of the
+ * winter forever.
+ */
+const badgePublished = new Set();
+
+/** Forget which stations are absent (tests). */
+export function clearAbsentStations() {
+  absentStations.clear();
+  badgePublished.clear();
+}
+
 const STATUS_TEXT = {
   en: {
+    removed: 'Removed from the BIXI network (seasonal?)',
     ok: 'OK',
     outOfService: 'Out of service',
     noRental: 'no rental',
@@ -71,6 +94,7 @@ const STATUS_TEXT = {
     noDock: 'no free dock',
   },
   fr: {
+    removed: 'Retirée du réseau BIXI (saisonnier ?)',
     ok: 'OK',
     outOfService: 'Hors service',
     noRental: 'location impossible',
@@ -88,6 +112,9 @@ const STATUS_TEXT = {
  */
 export function formatStatus(station, language = 'fr') {
   const text = STATUS_TEXT[language];
+  if (station.absent) {
+    return text.removed;
+  }
   if (!station.installed) {
     return text.outOfService;
   }
@@ -127,6 +154,50 @@ export function deviceName(station, language) {
 }
 
 /**
+ * Follow a station leaving and coming back to the feed: one log line and one
+ * badge change per transition, not one per read all winter long.
+ *
+ * The badge is the orange dot of the device in Gladys, with the reason in its
+ * tooltip: somebody wondering why a station shows 0 bikes since November
+ * looks at the device, not at the container logs. It is best effort, like
+ * every transport badge (an older Gladys has no such endpoint).
+ *
+ * @param {object} gladys
+ * @param {string} deviceExternalId
+ * @param {string} id
+ * @param {{ absent?: boolean }} live
+ */
+async function noteAbsence(gladys, deviceExternalId, id, live) {
+  const wasAbsent = absentStations.has(id);
+  const changed = Boolean(live.absent) !== wasAbsent;
+  if (!changed && badgePublished.has(id)) {
+    return;
+  }
+  const entry = { external_id: deviceExternalId, transport: DEVICE_TRANSPORTS.CLOUD };
+  if (live.absent && changed) {
+    absentStations.add(id);
+    logger.warn(
+      `BIXI station ${id} is no longer in the network feed (removed for the winter?): ` +
+        `it is now shown as removed and read every ${ABSENT_POLL_SECONDS / 60} minutes`,
+    );
+    entry.degraded = true;
+    entry.message = {
+      en: 'This station is no longer in the BIXI network (removed for the winter?).',
+      fr: 'Cette station n’est plus dans le réseau BIXI (retirée pour l’hiver ?).',
+    };
+  } else if (changed) {
+    absentStations.delete(id);
+    logger.info(`BIXI station ${id} is back in the network feed`);
+  }
+  badgePublished.add(id);
+  try {
+    await gladys.publishTransports?.([entry]);
+  } catch (err) {
+    logger.debug(`Transport badge of BIXI station ${id} not published: ${err.message}`);
+  }
+}
+
+/**
  * The blueprint of one watched station.
  * @param {{ id: string, name: string | null }} station
  */
@@ -141,7 +212,10 @@ export function createBixiStationBlueprint(station) {
     },
 
     pollIntervalMs(config) {
-      return config.bixi_poll_frequency * 1000;
+      const seconds = absentStations.has(station.id)
+        ? Math.max(config.bixi_poll_frequency, ABSENT_POLL_SECONDS)
+        : config.bixi_poll_frequency;
+      return seconds * 1000;
     },
 
     buildDevice(gladys, config) {
@@ -194,6 +268,7 @@ export function createBixiStationBlueprint(station) {
     async onPoll(gladys, config) {
       const ids = gladys.externalIds(DEVICE_TYPE, station.id);
       const live = await this.read(config);
+      await noteAbsence(gladys, ids.device, station.id, live);
 
       logger.info(
         `BIXI ${station.id}: ${live.bikes ?? '?'} bike(s), ${live.docks ?? '?'} free dock(s)`,

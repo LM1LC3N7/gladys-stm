@@ -70,6 +70,16 @@ test('metro events: one per line whose status changed, unknown is a hole', () =>
   );
 });
 
+test('a station leaving and coming back to the feed is one event each way', () => {
+  const live = { bikes: 3, docks: 4, installed: true };
+  const removed = { bikes: 0, docks: 0, installed: false, absent: true };
+  assert.deepEqual(bixiStationEvents(live, removed), ['out_of_service']);
+  assert.deepEqual(bixiStationEvents(removed, removed), []);
+  assert.deepEqual(bixiStationEvents(removed, live), ['back_in_service']);
+  // Already out of service before it was removed: nothing new to announce.
+  assert.deepEqual(bixiStationEvents({ ...live, installed: false }, removed), []);
+});
+
 test('BIXI events', () => {
   assert.deepEqual(bixiStationEvents({ bikes: 2, docks: 0 }, { bikes: 0, docks: 2 }), [
     'no_bike',

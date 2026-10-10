@@ -63,9 +63,21 @@ test('the network files are read once for every station of a cycle', async () =>
   assert.equal(calls.length, 4);
 });
 
-test('a station missing from the feed is an error, not a station with no bike', async () => {
+test('a station missing from the feed is a removed station, not a failed read', async () => {
   stubFetch(bixiRoutes());
-  await assert.rejects(fetchStation(config, { id: '999' }), /not in the network feed/);
+  const station = await fetchStation(config, { id: '999' });
+  assert.equal(station.absent, true);
+  assert.equal(station.installed, false);
+  assert.equal(station.bikes, 0);
+});
+
+test('an empty network is a broken feed, not every station removed', async () => {
+  stubFetch({
+    ...bixiRoutes(),
+    'fr/station_status.json': { data: { stations: [] } },
+    'fr/station_information.json': { data: { stations: [] } },
+  });
+  await assert.rejects(fetchStation(config, { id: '1' }), /lists no station/);
 });
 
 test('the search ignores case and accents', async () => {

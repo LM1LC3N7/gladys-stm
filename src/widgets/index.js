@@ -254,6 +254,28 @@ export function metroStatusContent(status) {
  */
 export function bixiStationContent(name, station, chartFeatures = []) {
   const components = [heading(name)];
+  if (station.absent) {
+    // Three tiles reading 0 would say "empty station"; the station is gone.
+    components.push({
+      type: 'text',
+      variant: WIDGET_TEXT_VARIANTS.BODY,
+      text: {
+        en: 'This station is no longer in the BIXI network, probably removed for the winter. It will show up again when BIXI puts it back.',
+        fr: 'Cette station n’est plus dans le réseau BIXI, probablement retirée pour l’hiver. Elle réapparaîtra quand BIXI la remettra en place.',
+      },
+    });
+    components.push({
+      type: 'status',
+      items: [
+        {
+          label: { en: 'State', fr: 'État' },
+          value: { en: 'Removed', fr: 'Retirée' },
+          color: DANGER,
+        },
+      ],
+    });
+    return { ttl_seconds: TTL_SECONDS[WIDGET_KEYS.BIXI_STATION], components };
+  }
   if (Number.isFinite(station.bikes)) {
     components.push({
       type: 'value',

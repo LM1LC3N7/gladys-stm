@@ -131,6 +131,13 @@ disponible.
 **Station BIXI :** les vélos (électriques compris), les vélos électriques, les
 points d'ancrage libres et l'état de la station.
 
+Une partie des stations BIXI est retirée chaque hiver. Une station qui
+disparaît du réseau affiche 0 vélo, 0 place et l'état « Retirée du réseau BIXI
+(saisonnier ?) », avec un point orange sur l'appareil. Le déclencheur « Hors
+service » se déclenche une fois, puis « Remise en service » quand la station
+revient au printemps. Il n'y a rien à faire : l'appareil reprend tout seul.
+Pendant son absence, la station n'est vérifiée que toutes les 15 minutes.
+
 ## Scènes
 
 **Déclencheurs :**
@@ -153,14 +160,15 @@ points d'ancrage libres et l'état de la station.
 
 ## Dépannage
 
-| Message ou symptôme                                    | Que faire                                                                                                             |
-| ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
-| « indiquez l'adresse de votre maison »                 | _Paramètres → Maisons_ : placez la maison sur la carte, puis enregistrez à nouveau la configuration de l'intégration. |
-| « Gladys n'a pas partagé la position de votre maison » | Réinstallez l'intégration et acceptez l'accès à la position, ou tapez des codes d'arrêt.                              |
-| Rien dans l'onglet Découverte                          | Lisez le message de la page de configuration : il dit ce qui manque.                                                  |
-| « La STM a refusé la clé d'API »                       | Vérifiez la clé, et que l'application est abonnée aux deux API (GTFS-realtime et i3).                                 |
-| « Quota épuisé »                                       | Augmentez les intervalles (section Avancé), ou vérifiez qu'une autre application n'utilise pas le même compte STM.    |
-| Un arrêt reste à 999                                   | Aucun autobus prévu (la nuit), ou un filtre de ligne qui ne correspond à aucune ligne de l'arrêt.                     |
+| Message ou symptôme                                    | Que faire                                                                                                                                             |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| « indiquez l'adresse de votre maison »                 | _Paramètres → Maisons_ : placez la maison sur la carte, puis enregistrez à nouveau la configuration de l'intégration.                                 |
+| « Gladys n'a pas partagé la position de votre maison » | Réinstallez l'intégration et acceptez l'accès à la position, ou tapez des codes d'arrêt.                                                              |
+| Rien dans l'onglet Découverte                          | Lisez le message de la page de configuration : il dit ce qui manque.                                                                                  |
+| « La STM a refusé la clé d'API »                       | Vérifiez la clé, et que l'application est abonnée aux deux API (GTFS-realtime et i3).                                                                 |
+| « Quota épuisé »                                       | Augmentez les intervalles (section Avancé), ou vérifiez qu'une autre application n'utilise pas le même compte STM.                                    |
+| Station BIXI « Retirée du réseau »                     | La station n'est plus dans le réseau BIXI, souvent pour l'hiver : elle reviendra seule. Pour en suivre une autre, voir « Chercher une station BIXI ». |
+| Un arrêt reste à 999                                   | Aucun autobus prévu (la nuit), ou un filtre de ligne qui ne correspond à aucune ligne de l'arrêt.                                                     |
 
 ## Vie privée, données et licences
 
