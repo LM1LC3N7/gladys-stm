@@ -10,6 +10,8 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-10
+
 ### Added
 
 - Next STM bus departures for the watched stops, from the STM GTFS-Realtime
@@ -29,3 +31,6 @@ the notes of the version's GitHub Release.
 - The connection status line tells what to do next (locate the house, add the
   devices, what a key would add).
 - A step-by-step guide to get the STM key in the user documentation.
+
+[Unreleased]: https://github.com/LM1LC3N7/gladys-stm/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/LM1LC3N7/gladys-stm/releases/tag/v0.2.0

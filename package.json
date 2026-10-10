@@ -1,6 +1,6 @@
 {
   "name": "gladys-stm",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Gladys Assistant external integration for Montréal's STM: next bus departures, metro service status and BIXI stations.",
   "type": "module",
