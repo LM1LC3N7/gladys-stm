@@ -23,7 +23,7 @@ import { gladysPollFrequency } from '../config.js';
 import { TEXT_FEATURE_RANGE } from './featureRange.js';
 import { changedStates } from './stateCache.js';
 import { publishDeviceStates } from './publish.js';
-import { fetchStation } from '../api/bixi.js';
+import { fetchStation, knownStationName } from '../api/bixi.js';
 
 export const DEVICE_TYPE = 'bixi-station';
 
@@ -41,16 +41,19 @@ export const FEATURE = {
 // ceiling no station reaches.
 const MAX_COUNT = 200;
 
+/** What every BIXI station device name starts with (see busStop.js). */
+export const NAME_PREFIX = 'BIXI – ';
+
 const LABELS = {
   en: {
-    device: 'BIXI station',
+    station: 'station',
     bikes: 'Bikes',
     electricBikes: 'Electric bikes',
     docks: 'Free docks',
     status: 'Status',
   },
   fr: {
-    device: 'Station BIXI',
+    station: 'station',
     bikes: 'Vélos',
     electricBikes: 'Vélos électriques',
     docks: 'Points d’ancrage libres',
@@ -110,6 +113,20 @@ export function computeOccupancy(station) {
 }
 
 /**
+ * Device name when the user did not give one: "BIXI – " then the station name
+ * (from the suggestion, else from the last read of the network), else its id.
+ * @param {{ id: string, name: string | null, label?: string }} station
+ * @param {string} language
+ */
+export function deviceName(station, language) {
+  if (station.name) {
+    return station.name;
+  }
+  const place = station.label || knownStationName(station.id);
+  return `${NAME_PREFIX}${place || `${LABELS[language].station} ${station.id}`}`;
+}
+
+/**
  * The blueprint of one watched station.
  * @param {{ id: string, name: string | null }} station
  */
@@ -143,7 +160,7 @@ export function createBixiStationBlueprint(station) {
       });
 
       return {
-        name: station.name ?? `${labels.device} ${station.id}`,
+        name: deviceName(station, config.language),
         external_id: ids.device,
         poll_frequency: gladysPollFrequency(config.bixi_poll_frequency),
         should_poll: true,

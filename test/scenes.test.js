@@ -126,7 +126,7 @@ test('the departure trigger carries the stop device and the threshold as a strin
       key: SCENE_TRIGGERS.DEPARTURE_APPROACHING,
       data: {
         stop: 'stm-bus-stop:52743',
-        stop_name: 'Arrêt STM 52743',
+        stop_name: 'Bus – arrêt 52743',
         route: '24',
         threshold: '5',
         minutes: 4,

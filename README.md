@@ -11,7 +11,7 @@ brings Montréal public transit into your smart home:
 
 **Zero configuration to start:** the integration reads the location of the
 house from Gladys and offers the closest bus stops and BIXI stations in the
-Discover tab, named the way people know them ("Notre-Dame / Peel (36 →
+Discover tab, named the way people know them ("Bus – Notre-Dame / Peel (36 →
 Ouest)"). No account, no code to look up.
 
 Unofficial: not affiliated with the Société de transport de Montréal nor with

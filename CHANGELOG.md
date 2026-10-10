@@ -10,6 +10,15 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+### Changed
+
+- Bus stop and BIXI station devices are named "Bus – …" and "BIXI – …", so
+  the two kinds are easy to tell apart in the Discover tab and the device
+  list. Devices already added keep their name: rename them in Gladys, or
+  delete and add them again.
+- GitHub Actions updated (checkout 7, setup-node 7, Docker actions), and
+  Dependabot now groups the action updates in a single pull request.
+
 ## [0.2.0] - 2026-10-10
 
 ### Added

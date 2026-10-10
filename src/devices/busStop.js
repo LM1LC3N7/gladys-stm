@@ -61,14 +61,14 @@ const LABELS = {
     route: (rank) => (rank === 1 ? 'Next departure route' : `Departure ${rank} route`),
     summary: 'Next departures',
     none: 'No upcoming departure',
-    device: 'STM stop',
+    stop: 'stop',
   },
   fr: {
     departure: (rank) => (rank === 1 ? 'Prochain passage' : `Passage ${rank}`),
     route: (rank) => (rank === 1 ? 'Ligne du prochain passage' : `Ligne du passage ${rank}`),
     summary: 'Prochains passages',
     none: 'Aucun passage à venir',
-    device: 'Arrêt STM',
+    stop: 'arrêt',
   },
 };
 
@@ -90,20 +90,29 @@ export function formatSummary(departures, language = 'fr') {
     .join(' · ');
 }
 
+/** What every bus stop device name starts with, so that a list of devices
+ * mixing stops and BIXI stations reads at a glance. */
+export const NAME_PREFIX = 'Bus – ';
+
 /**
- * Device name when the user did not give one: the stop name as people know it
- * when Transitous told us ("Peel / Notre-Dame"), else the stop code — plus the
- * route filter, e.g. "Peel / Notre-Dame (24)" or "Arrêt STM 51003 (24)".
- * @param {{ id: string, routes: string[], name: string | null }} stop
+ * Device name when the user did not give one: "Bus – " then the place as
+ * people know it — the label of a suggestion ("Peel / Notre-Dame (61 → Est)"),
+ * else the stop name Transitous told us, else the stop code — plus the route
+ * filter: "Bus – Peel / Notre-Dame (24)", "Bus – arrêt 51003 (24)". A name the
+ * user typed is theirs, and published untouched.
+ * @param {{ id: string, routes: string[], name: string | null, label?: string }} stop
  * @param {string} language
  */
 export function deviceName(stop, language) {
   if (stop.name) {
     return stop.name;
   }
+  if (stop.label) {
+    return `${NAME_PREFIX}${stop.label}`;
+  }
   const routes = stop.routes.length > 0 ? ` (${stop.routes.join(', ')})` : '';
   const known = knownStop(stop.id)?.name;
-  return known ? `${known}${routes}` : `${LABELS[language].device} ${stop.id}${routes}`;
+  return `${NAME_PREFIX}${known || `${LABELS[language].stop} ${stop.id}`}${routes}`;
 }
 
 const NO_SOURCE_MESSAGE = {

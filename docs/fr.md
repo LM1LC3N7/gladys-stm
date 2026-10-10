@@ -20,7 +20,7 @@ commencer.
    configuration et cliquez sur **Enregistrer**, sans rien remplir.
 3. Ouvrez l'onglet **Découverte** de l'intégration. Les 3 arrêts d'autobus et
    les 2 stations BIXI les plus proches de chez vous y sont proposés, avec
-   leur nom et la direction des lignes, par exemple « Notre-Dame / Peel (36 →
+   leur nom et la direction des lignes, par exemple « Bus – Notre-Dame / Peel (36 →
    Ouest) ». Cliquez sur **Ajouter** pour chacun de ceux qui vous intéressent.
 
 C'est tout. Vous avez maintenant, pour chaque arrêt, les **horaires prévus**
@@ -30,6 +30,10 @@ libres.
 Le message en haut de la page de configuration indique toujours la prochaine
 chose à faire. Par exemple : « Prêt : 3 arrêts et 2 stations BIXI à ajouter.
 Ouvrez l'onglet Découverte… ».
+
+Les noms des appareils commencent par **Bus –** ou **BIXI –**, pour les
+reconnaître d'un coup d'œil dans la liste des appareils de Gladys. Vous pouvez
+les renommer librement dans Gladys.
 
 ### Afficher les passages sur le tableau de bord
 

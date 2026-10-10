@@ -79,7 +79,7 @@ test('one device per watched entry, plus the metro', () => {
   const devices = buildDiscoveredDevices(gladys, config);
   assert.deepEqual(
     devices.map((device) => device.name),
-    ['Métro STM', 'Arrêt STM 52743', 'Bus du travail', 'Station BIXI 1'],
+    ['Métro STM', 'Bus – arrêt 52743', 'Bus du travail', 'BIXI – station 1'],
   );
   assert.deepEqual(
     devices.map((device) => device.external_id),

@@ -13,7 +13,7 @@ import {
   clearSuggestions,
   getSuggestions,
   refreshSuggestions,
-  suggestedStopName,
+  suggestedStopLabel,
 } from '../src/devices/suggestions.js';
 import { buildDiscoveredDevices } from '../src/devices/index.js';
 import { clearTransitousCache } from '../src/api/transitous.js';
@@ -44,7 +44,7 @@ test('the closest stops and stations are suggested, named the way people know th
 
   assert.equal(found.status, 'ok');
   assert.deepEqual(
-    found.stops.map((stop) => [stop.id, stop.name]),
+    found.stops.map((stop) => [stop.id, stop.label]),
     [
       // Same name, same direction: the code on the sign tells them apart. The
       // parenthesis the STM forgot is closed.
@@ -60,11 +60,12 @@ test('the closest stops and stations are suggested, named the way people know th
   );
 
   // Without typing anything, the Discovery screen offers them.
+  // The device names say what each device is: a bus stop or a BIXI station.
   const names = buildDiscoveredDevices(gladys, config).map((device) => device.name);
   assert.deepEqual(names, [
-    'École de technologie supérieure (Peel / Notre-Dame) (61 → Est) · 52743',
-    'École de technologie supérieure (Peel / Notre-Dame) (61 → Est) · 52744',
-    'de la Montagne / Notre-Dame',
+    'Bus – École de technologie supérieure (Peel / Notre-Dame) (61 → Est) · 52743',
+    'Bus – École de technologie supérieure (Peel / Notre-Dame) (61 → Est) · 52744',
+    'BIXI – de la Montagne / Notre-Dame',
   ]);
 });
 
@@ -90,9 +91,26 @@ test('a lookup that fails everywhere says so, without throwing', async () => {
   assert.deepEqual(getSuggestions().stops, []);
 });
 
+test('a name the user typed is never prefixed, a known station gets its name', async () => {
+  stubFetch(routes());
+  const gladys = createFakeGladys();
+  // Station 1 is read once (the BIXI list is then known), and typed without a name.
+  const config = normalizeConfig({
+    stops: '52743:Mon bus',
+    bixi_stations: '1',
+    nearby_bus_stops: 0,
+    nearby_bixi_stations: 1,
+  });
+  await refreshSuggestions(gladys, config);
+  assert.deepEqual(
+    buildDiscoveredDevices(gladys, config).map((device) => device.name),
+    ['Mon bus', 'BIXI – Drummond / de Maisonneuve', 'BIXI – de la Montagne / Notre-Dame'],
+  );
+});
+
 test('a suggested stop without description falls back on its name, then its code', () => {
-  assert.equal(suggestedStopName({ code: '1', name: 'Peel / Ottawa' }, null), 'Peel / Ottawa');
-  assert.equal(suggestedStopName({ code: '1', name: '' }, null), '1');
+  assert.equal(suggestedStopLabel({ code: '1', name: 'Peel / Ottawa' }, null), 'Peel / Ottawa');
+  assert.equal(suggestedStopLabel({ code: '1', name: '' }, null), '1');
 });
 
 test('status: nothing found asks to locate the house', async () => {

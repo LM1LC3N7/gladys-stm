@@ -6,7 +6,8 @@
 // the house is (the manifest declares `location: true`, which the user grants
 // at install time), so the integration looks the closest bus stops and BIXI
 // stations up itself and publishes them in the Discovery screen, named the way
-// people know them — "Peel / Notre-Dame (61 → Est)". Adding one is a click.
+// people know them and prefixed with what they are — "Bus – Peel / Notre-Dame
+// (61 → Est)", "BIXI – Peel / Notre-Dame". Adding one is a click.
 //
 // The suggestions are computed at every connection and configuration change,
 // and only ever ADD to what the user typed in the configuration. They are not
@@ -31,9 +32,13 @@ export const BIXI_RADIUS_METERS = 1000;
  * What the last lookup found. `status` says why there is nothing, for the
  * connection status: the user must be told what to do about it.
  *
+ * The entries carry a `label` (the place, as people know it) and no `name`:
+ * a `name` is the user's own, published as is, while a label gets the "Bus –"
+ * or "BIXI –" prefix of the device modules.
+ *
  * @type {{ status: 'disabled' | 'no_house' | 'no_location' | 'failed' | 'ok',
- *   stops: { id: string, routes: string[], name: string, distance: number }[],
- *   bixiStations: { id: string, name: string, distance: number }[] }}
+ *   stops: { id: string, routes: string[], name: null, label: string, distance: number }[],
+ *   bixiStations: { id: string, name: null, label: string, distance: number }[] }}
  */
 let suggestions = emptySuggestions('disabled');
 
@@ -77,12 +82,12 @@ async function homeLocation(gladys) {
 }
 
 /**
- * The name a suggested stop is published with: the stop name, then where its
- * routes go, which is what tells the two sides of a street apart.
+ * The label of a suggested stop: the stop name, then where its routes go,
+ * which is what tells the two sides of a street apart.
  * @param {{ code: string, name: string }} stop
  * @param {{ name: string, routes: object[] } | null} description
  */
-export function suggestedStopName(stop, description) {
+export function suggestedStopLabel(stop, description) {
   const name = description?.name || stop.name || stop.code;
   const routes = formatRoutes(description);
   return routes ? `${name} (${routes})` : name;
@@ -128,7 +133,8 @@ export async function refreshSuggestions(gladys, config) {
         next.stops.push({
           id: stop.code,
           routes: [],
-          name: suggestedStopName(stop, description),
+          name: null,
+          label: suggestedStopLabel(stop, description),
           distance: stop.distance,
         });
       }
@@ -145,7 +151,8 @@ export async function refreshSuggestions(gladys, config) {
         .filter((station) => Number.isFinite(station.lat) && Number.isFinite(station.lon))
         .map((station) => ({
           id: station.id,
-          name: station.name,
+          name: null,
+          label: station.name,
           distance: distanceMeters(home, station),
         }))
         .filter((station) => station.distance <= BIXI_RADIUS_METERS)
@@ -159,10 +166,10 @@ export async function refreshSuggestions(gladys, config) {
 
   // The two sides of a street often share a name AND a direction (a terminus,
   // a loop): the stop code, written on the sign, is then what tells them apart.
-  const names = next.stops.map((stop) => stop.name);
+  const labels = next.stops.map((stop) => stop.label);
   for (const stop of next.stops) {
-    if (names.filter((name) => name === stop.name).length > 1) {
-      stop.name = `${stop.name} · ${stop.id}`;
+    if (labels.filter((label) => label === stop.label).length > 1) {
+      stop.label = `${stop.label} · ${stop.id}`;
     }
   }
 

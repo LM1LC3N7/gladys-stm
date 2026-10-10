@@ -18,7 +18,7 @@ No technical knowledge is needed, and no account to begin with.
    **Save**, without filling anything in.
 3. Open the **Discover** tab of the integration. The 3 bus stops and 2 BIXI
    stations closest to your home are offered there, with their name and the
-   direction of their routes, e.g. "Notre-Dame / Peel (36 → Ouest)". Press
+   direction of their routes, e.g. "Bus – Notre-Dame / Peel (36 → Ouest)". Press
    **Add** on each one you want.
 
 That's it. You now get the **scheduled times** of the next buses at each stop,
@@ -27,6 +27,9 @@ and the bikes and free docks of each BIXI station.
 The message at the top of the configuration page always tells you what to do
 next. For example: "Ready: 3 bus stops and 2 BIXI stations to add. Open the
 Discover tab…".
+
+Device names start with **Bus –** or **BIXI –**, so they are easy to tell
+apart in the device list of Gladys. You can rename them freely in Gladys.
 
 ### Showing the departures on the dashboard
 

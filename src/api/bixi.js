@@ -34,6 +34,20 @@ const cache = new Map();
 /** @type {Map<string, Promise<unknown>>} */
 const inFlight = new Map();
 
+/**
+ * The name of a station from the station list already read, without any
+ * request: the device name uses it when the user gave none.
+ * @param {string} id
+ * @returns {string | null}
+ */
+export function knownStationName(id) {
+  const stations = cache.get('station_information')?.value?.data?.stations;
+  const station = Array.isArray(stations)
+    ? stations.find((candidate) => String(candidate?.station_id) === String(id))
+    : undefined;
+  return station?.name ? String(station.name) : null;
+}
+
 /** Forget every cached file (configuration change, tests). */
 export function clearBixiCache() {
   cache.clear();
