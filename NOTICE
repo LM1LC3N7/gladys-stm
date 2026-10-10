@@ -1,0 +1,18 @@
+Gladys STM Montréal
+Copyright 2026 the gladys-stm contributors
+
+This product includes software adapted from:
+
+  - gladys-transport-commun-lyonnais (https://github.com/prohand/gladys-transport-commun-lyonnais),
+    licensed under the Apache License 2.0: src/devices/pollSchedule.js,
+    stateCache.js, readings.js, featureRange.js, publish.js, refreshLoop.js,
+    and the structure of index.js, src/devices/index.js, src/scenes/ and
+    src/widgets/.
+  - integration-template-js (https://github.com/GladysAssistant/integration-template-js),
+    licensed under the Apache License 2.0: the GitHub workflows, the release
+    script, the Dockerfile and the lint configuration.
+
+Data sources (not distributed with this software):
+
+  - Société de transport de Montréal open data, CC BY 4.0.
+  - BIXI Montréal public GBFS feed.

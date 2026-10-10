@@ -1,0 +1,492 @@
+{
+  "manifest_version": 1,
+  "type": "device",
+  "name": "STM Montréal",
+  "description": {
+    "en": "Next STM bus departures, metro line status and BIXI stations in Montréal.",
+    "fr": "Prochains passages d'autobus STM, état du métro et stations BIXI à Montréal."
+  },
+  "version": "0.1.0",
+  "docker_image": "ghcr.io/lm1lc3n7/gladys-stm:0.1.0",
+  "gladys_version": ">=5.1.0",
+  "cover_image": "https://raw.githubusercontent.com/LM1LC3N7/gladys-stm/main/cover.png",
+  "categories": ["services"],
+  "transports": ["cloud"],
+  "config_schema": [
+    {
+      "key": "intro",
+      "type": "section",
+      "label": { "en": "How it works", "fr": "Comment ça marche" },
+      "description": {
+        "en": "This integration creates one read-only device per bus stop and BIXI station listed below, plus one device for the metro status. BIXI works out of the box (open feed). Bus departures and the metro status come from the STM open data API, which needs a free personal key.",
+        "fr": "Cette intégration crée un appareil en lecture seule par arrêt d'autobus et par station BIXI listés ci-dessous, plus un appareil pour l'état du métro. BIXI fonctionne sans rien configurer (flux ouvert). Les passages d'autobus et l'état du métro viennent de l'API de données ouvertes de la STM, qui demande une clé personnelle gratuite."
+      },
+      "links": [
+        {
+          "url": "https://www.stm.info/fr/a-propos/developpeurs",
+          "label": { "en": "STM developers", "fr": "Développeurs STM" }
+        },
+        {
+          "url": "https://www.stm.info/fr/a-propos/developpeurs/condition-dutilisation",
+          "label": { "en": "STM terms of use", "fr": "Conditions d'utilisation STM" }
+        }
+      ]
+    },
+    {
+      "key": "account",
+      "type": "section",
+      "label": { "en": "STM API key", "fr": "Clé d'API STM" },
+      "description": {
+        "en": "Create an account on the STM developer portal, add an application, subscribe it to the \"GTFS-realtime\" and \"i3\" APIs, then create and publish a key. The quota (10,000 requests a day) is shared by all the applications of your account. Leave the field empty if you only watch BIXI stations.",
+        "fr": "Créez un compte sur le portail développeurs de la STM, ajoutez une application, abonnez-la aux API « GTFS-realtime » et « i3 », puis créez et publiez une clé. Le quota (10 000 requêtes par jour) est partagé par toutes les applications de votre compte. Laissez le champ vide si vous ne surveillez que des stations BIXI."
+      },
+      "links": [
+        {
+          "url": "https://portail.developpeurs.stm.info/apihub",
+          "label": { "en": "STM developer portal", "fr": "Portail développeurs STM" }
+        },
+        {
+          "url": "https://www.stm.info/en/about/developers/faq-new-api-hub",
+          "label": { "en": "API hub FAQ", "fr": "FAQ du portail" }
+        }
+      ]
+    },
+    {
+      "key": "stm_api_key",
+      "type": "secret",
+      "label": { "en": "STM API key", "fr": "Clé d'API STM" },
+      "description": {
+        "en": "The key of your application on the STM developer portal (the shared secret is not needed).",
+        "fr": "La clé de votre application sur le portail développeurs de la STM (le secret partagé n'est pas nécessaire)."
+      },
+      "required": false
+    },
+    {
+      "key": "watch",
+      "type": "section",
+      "label": { "en": "What to watch", "fr": "Quoi surveiller" },
+      "description": {
+        "en": "The stop code is the five-digit number written on every STM bus stop sign. Use the search button below to find a BIXI station id.",
+        "fr": "Le code d'arrêt est le numéro à cinq chiffres inscrit sur chaque panneau d'arrêt de la STM. Utilisez le bouton de recherche ci-dessous pour trouver l'identifiant d'une station BIXI."
+      }
+    },
+    {
+      "key": "stops",
+      "type": "string",
+      "label": { "en": "Bus stops", "fr": "Arrêts d'autobus" },
+      "description": {
+        "en": "Stop codes. Optional route filter after @ and custom name after : — e.g. \"52743, 51003@24:Bus to work, 61503@69|469\".",
+        "fr": "Codes d'arrêt. Filtre de lignes optionnel après @ et nom personnalisé après : — ex. « 52743, 51003@24:Bus du travail, 61503@69|469 »."
+      },
+      "required": false,
+      "placeholder": {
+        "en": "52743, 51003@24:Bus to work",
+        "fr": "52743, 51003@24:Bus du travail"
+      }
+    },
+    {
+      "key": "watch_metro",
+      "type": "boolean",
+      "label": { "en": "Watch the metro", "fr": "Surveiller le métro" },
+      "description": {
+        "en": "Creates a \"STM metro\" device with the status of the green, orange, yellow and blue lines.",
+        "fr": "Crée un appareil « Métro STM » avec l'état des lignes verte, orange, jaune et bleue."
+      },
+      "required": false,
+      "default": true
+    },
+    {
+      "key": "bixi_stations",
+      "type": "string",
+      "label": { "en": "BIXI stations", "fr": "Stations BIXI" },
+      "description": {
+        "en": "BIXI station ids, with an optional custom name after : — e.g. \"1, 42:Station at home\".",
+        "fr": "Identifiants de stations BIXI, avec un nom personnalisé optionnel après : — ex. « 1, 42:Station de la maison »."
+      },
+      "required": false,
+      "placeholder": { "en": "1, 42:Station at home", "fr": "1, 42:Station de la maison" }
+    },
+    {
+      "key": "refresh",
+      "type": "section",
+      "label": { "en": "Refresh and display", "fr": "Rafraîchissement et affichage" },
+      "description": {
+        "en": "One read of the STM bus feed serves every watched stop. With the defaults, the integration uses about 2,200 of your 10,000 daily STM requests.",
+        "fr": "Une seule lecture du flux autobus de la STM sert tous les arrêts surveillés. Avec les valeurs par défaut, l'intégration utilise environ 2 200 de vos 10 000 requêtes STM quotidiennes."
+      }
+    },
+    {
+      "key": "departures_poll_frequency",
+      "type": "number",
+      "label": {
+        "en": "Departures refresh interval (s)",
+        "fr": "Rafraîchissement des passages (s)"
+      },
+      "description": {
+        "en": "How often the bus departures are refreshed, in seconds.",
+        "fr": "Fréquence de rafraîchissement des passages d'autobus, en secondes."
+      },
+      "required": false,
+      "default": 60,
+      "min": 30,
+      "max": 3600
+    },
+    {
+      "key": "metro_poll_frequency",
+      "type": "number",
+      "label": {
+        "en": "Metro refresh interval (s)",
+        "fr": "Rafraîchissement du métro (s)"
+      },
+      "description": {
+        "en": "How often the metro status is refreshed, in seconds.",
+        "fr": "Fréquence de rafraîchissement de l'état du métro, en secondes."
+      },
+      "required": false,
+      "default": 120,
+      "min": 30,
+      "max": 3600
+    },
+    {
+      "key": "bixi_poll_frequency",
+      "type": "number",
+      "label": {
+        "en": "BIXI refresh interval (s)",
+        "fr": "Rafraîchissement BIXI (s)"
+      },
+      "description": {
+        "en": "How often the BIXI stations are refreshed, in seconds.",
+        "fr": "Fréquence de rafraîchissement des stations BIXI, en secondes."
+      },
+      "required": false,
+      "default": 120,
+      "min": 30,
+      "max": 3600
+    },
+    {
+      "key": "max_departures",
+      "type": "number",
+      "label": { "en": "Departures per stop", "fr": "Passages par arrêt" },
+      "description": {
+        "en": "How many upcoming departures each stop device exposes as features.",
+        "fr": "Nombre de prochains passages exposés en fonctionnalités par arrêt."
+      },
+      "required": false,
+      "default": 3,
+      "min": 1,
+      "max": 5
+    },
+    {
+      "key": "language",
+      "type": "select",
+      "label": { "en": "Language of the values", "fr": "Langue des valeurs" },
+      "description": {
+        "en": "Language of the feature names and of the texts published (metro messages, statuses).",
+        "fr": "Langue des noms de fonctionnalités et des textes publiés (messages du métro, états)."
+      },
+      "required": false,
+      "default": "fr",
+      "options": [
+        { "value": "fr", "label": { "en": "French", "fr": "Français" } },
+        { "value": "en", "label": { "en": "English", "fr": "Anglais" } }
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "key": "test_stm_api",
+      "label": { "en": "Test the STM API key", "fr": "Tester la clé d'API STM" },
+      "timeout_seconds": 30
+    },
+    {
+      "key": "search_bixi_stations",
+      "label": { "en": "Find a BIXI station", "fr": "Chercher une station BIXI" },
+      "timeout_seconds": 30,
+      "fields": [
+        {
+          "key": "query",
+          "type": "string",
+          "label": { "en": "Station name", "fr": "Nom de la station" },
+          "placeholder": { "en": "Berri", "fr": "Berri" },
+          "required": true
+        }
+      ]
+    }
+  ],
+  "scene_triggers": [
+    {
+      "key": "departure_approaching",
+      "label": { "en": "STM bus approaching", "fr": "Autobus STM imminent" },
+      "description": {
+        "en": "A bus of a watched stop is now less than the chosen number of minutes away.",
+        "fr": "Un autobus d'un arrêt surveillé passe désormais dans moins du nombre de minutes choisi."
+      },
+      "fields": [
+        {
+          "key": "stop",
+          "type": "select",
+          "source": "devices",
+          "label": { "en": "Bus stop", "fr": "Arrêt" },
+          "required": true
+        },
+        {
+          "key": "threshold",
+          "type": "select",
+          "label": { "en": "Minutes before departure", "fr": "Minutes avant le passage" },
+          "required": true,
+          "options": [
+            { "value": "1", "label": { "en": "1 minute", "fr": "1 minute" } },
+            { "value": "2", "label": { "en": "2 minutes", "fr": "2 minutes" } },
+            { "value": "3", "label": { "en": "3 minutes", "fr": "3 minutes" } },
+            { "value": "5", "label": { "en": "5 minutes", "fr": "5 minutes" } },
+            { "value": "10", "label": { "en": "10 minutes", "fr": "10 minutes" } },
+            { "value": "15", "label": { "en": "15 minutes", "fr": "15 minutes" } }
+          ]
+        },
+        {
+          "key": "route",
+          "type": "string",
+          "label": { "en": "Route (empty: any)", "fr": "Ligne (vide : toutes)" },
+          "placeholder": { "en": "24", "fr": "24" }
+        }
+      ],
+      "variables": [
+        { "key": "stop_name", "type": "string", "label": { "en": "Stop", "fr": "Arrêt" } },
+        { "key": "route", "type": "string", "label": { "en": "Route", "fr": "Ligne" } },
+        {
+          "key": "minutes",
+          "type": "number",
+          "label": { "en": "Minutes to wait", "fr": "Minutes d'attente" }
+        }
+      ]
+    },
+    {
+      "key": "metro_status_changed",
+      "label": { "en": "STM metro status changed", "fr": "État du métro STM modifié" },
+      "description": {
+        "en": "A metro line was disrupted, got back to normal, or received a service notice.",
+        "fr": "Une ligne de métro a été perturbée, est revenue à la normale ou a reçu un avis de service."
+      },
+      "fields": [
+        {
+          "key": "line",
+          "type": "multi_select",
+          "label": { "en": "Lines", "fr": "Lignes" },
+          "options": [
+            { "value": "1", "label": { "en": "Green line", "fr": "Ligne verte" } },
+            { "value": "2", "label": { "en": "Orange line", "fr": "Ligne orange" } },
+            { "value": "4", "label": { "en": "Yellow line", "fr": "Ligne jaune" } },
+            { "value": "5", "label": { "en": "Blue line", "fr": "Ligne bleue" } }
+          ]
+        },
+        {
+          "key": "event",
+          "type": "multi_select",
+          "label": { "en": "Events", "fr": "Événements" },
+          "options": [
+            { "value": "disrupted", "label": { "en": "Disrupted", "fr": "Perturbée" } },
+            {
+              "value": "restored",
+              "label": { "en": "Back to normal", "fr": "Retour à la normale" }
+            },
+            { "value": "notice", "label": { "en": "Service notice", "fr": "Avis de service" } }
+          ]
+        }
+      ],
+      "variables": [
+        { "key": "line_name", "type": "string", "label": { "en": "Line", "fr": "Ligne" } },
+        { "key": "event", "type": "string", "label": { "en": "Event", "fr": "Événement" } },
+        {
+          "key": "message",
+          "type": "string",
+          "label": { "en": "STM message", "fr": "Message STM" }
+        }
+      ]
+    },
+    {
+      "key": "bixi_station_changed",
+      "label": { "en": "BIXI station changed", "fr": "Station BIXI modifiée" },
+      "description": {
+        "en": "A watched BIXI station ran out of bikes or docks, got some back, or changed service.",
+        "fr": "Une station BIXI surveillée n'a plus de vélos ou de places, en retrouve, ou change de service."
+      },
+      "fields": [
+        {
+          "key": "station",
+          "type": "select",
+          "source": "devices",
+          "label": { "en": "BIXI station", "fr": "Station BIXI" },
+          "required": true
+        },
+        {
+          "key": "event",
+          "type": "multi_select",
+          "label": { "en": "Events", "fr": "Événements" },
+          "options": [
+            { "value": "no_bike", "label": { "en": "No bike left", "fr": "Plus aucun vélo" } },
+            { "value": "bikes_back", "label": { "en": "Bikes back", "fr": "Vélos de retour" } },
+            { "value": "no_dock", "label": { "en": "No free dock", "fr": "Plus aucune place" } },
+            { "value": "docks_back", "label": { "en": "Docks back", "fr": "Places de retour" } },
+            {
+              "value": "out_of_service",
+              "label": { "en": "Out of service", "fr": "Hors service" }
+            },
+            {
+              "value": "back_in_service",
+              "label": { "en": "Back in service", "fr": "Remise en service" }
+            }
+          ]
+        }
+      ],
+      "variables": [
+        { "key": "station_name", "type": "string", "label": { "en": "Station", "fr": "Station" } },
+        { "key": "event", "type": "string", "label": { "en": "Event", "fr": "Événement" } },
+        { "key": "bikes", "type": "number", "label": { "en": "Bikes", "fr": "Vélos" } },
+        {
+          "key": "electric_bikes",
+          "type": "number",
+          "label": { "en": "Electric bikes", "fr": "Vélos électriques" }
+        },
+        { "key": "docks", "type": "number", "label": { "en": "Free docks", "fr": "Places libres" } }
+      ]
+    }
+  ],
+  "scene_actions": [
+    {
+      "key": "get_next_departures",
+      "label": { "en": "Read the next STM buses", "fr": "Lire les prochains autobus STM" },
+      "description": {
+        "en": "Reads the next departures of a watched bus stop, now.",
+        "fr": "Lit maintenant les prochains passages d'un arrêt surveillé."
+      },
+      "timeout_seconds": 30,
+      "fields": [
+        {
+          "key": "stop",
+          "type": "select",
+          "source": "devices",
+          "label": { "en": "Bus stop", "fr": "Arrêt" },
+          "required": true
+        },
+        {
+          "key": "route",
+          "type": "string",
+          "label": { "en": "Route (empty: any)", "fr": "Ligne (vide : toutes)" },
+          "placeholder": { "en": "24", "fr": "24" }
+        }
+      ],
+      "outputs": [
+        { "key": "route", "type": "string", "label": { "en": "Route", "fr": "Ligne" } },
+        {
+          "key": "minutes",
+          "type": "number",
+          "label": { "en": "Minutes to wait", "fr": "Minutes d'attente" }
+        },
+        {
+          "key": "following_minutes",
+          "type": "number",
+          "label": { "en": "Minutes to the following one", "fr": "Minutes jusqu'au suivant" }
+        },
+        {
+          "key": "summary",
+          "type": "string",
+          "label": { "en": "Departure board", "fr": "Tableau des passages" }
+        },
+        {
+          "key": "count",
+          "type": "number",
+          "label": { "en": "Upcoming departures", "fr": "Passages à venir" }
+        }
+      ]
+    },
+    {
+      "key": "get_metro_status",
+      "label": { "en": "Read an STM metro line status", "fr": "État d'une ligne de métro" },
+      "description": {
+        "en": "Reads the current status of one metro line, now.",
+        "fr": "Lit maintenant l'état actuel d'une ligne de métro."
+      },
+      "timeout_seconds": 30,
+      "fields": [
+        {
+          "key": "line",
+          "type": "select",
+          "label": { "en": "Line", "fr": "Ligne" },
+          "required": true,
+          "options": [
+            { "value": "1", "label": { "en": "Green line", "fr": "Ligne verte" } },
+            { "value": "2", "label": { "en": "Orange line", "fr": "Ligne orange" } },
+            { "value": "4", "label": { "en": "Yellow line", "fr": "Ligne jaune" } },
+            { "value": "5", "label": { "en": "Blue line", "fr": "Ligne bleue" } }
+          ]
+        }
+      ],
+      "outputs": [
+        { "key": "line_name", "type": "string", "label": { "en": "Line", "fr": "Ligne" } },
+        {
+          "key": "status",
+          "type": "string",
+          "label": { "en": "Status code", "fr": "Code d'état" }
+        },
+        { "key": "status_label", "type": "string", "label": { "en": "Status", "fr": "État" } },
+        {
+          "key": "message",
+          "type": "string",
+          "label": { "en": "STM message", "fr": "Message STM" }
+        },
+        {
+          "key": "normal",
+          "type": "boolean",
+          "label": { "en": "Normal service", "fr": "Service normal" }
+        }
+      ]
+    }
+  ],
+  "widgets": [
+    {
+      "key": "departures",
+      "label": { "en": "STM bus departures", "fr": "Passages d'autobus STM" },
+      "description": {
+        "en": "The next departures of a watched bus stop.",
+        "fr": "Les prochains passages d'un arrêt surveillé."
+      },
+      "icon": "clock",
+      "settings": [
+        {
+          "key": "stop",
+          "type": "select",
+          "source": "devices",
+          "label": { "en": "Bus stop", "fr": "Arrêt" },
+          "required": true
+        }
+      ]
+    },
+    {
+      "key": "metro_status",
+      "label": { "en": "STM metro status", "fr": "État du métro STM" },
+      "description": {
+        "en": "The status of the four metro lines, with the STM messages.",
+        "fr": "L'état des quatre lignes de métro, avec les messages de la STM."
+      },
+      "icon": "activity"
+    },
+    {
+      "key": "bixi_station",
+      "label": { "en": "BIXI station", "fr": "Station BIXI" },
+      "description": {
+        "en": "Bikes, e-bikes and free docks of a watched BIXI station.",
+        "fr": "Vélos, vélos électriques et places libres d'une station BIXI surveillée."
+      },
+      "icon": "map-pin",
+      "settings": [
+        {
+          "key": "station",
+          "type": "select",
+          "source": "devices",
+          "label": { "en": "BIXI station", "fr": "Station BIXI" },
+          "required": true
+        }
+      ]
+    }
+  ]
+}
