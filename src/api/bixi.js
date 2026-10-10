@@ -152,7 +152,13 @@ export function mergeStations(information, status) {
   for (const station of information?.data?.stations ?? []) {
     if (station?.station_id === undefined) continue;
     const id = String(station.station_id);
-    stations.set(id, { id, name: String(station.name ?? id), capacity: count(station.capacity) });
+    stations.set(id, {
+      id,
+      name: String(station.name ?? id),
+      capacity: count(station.capacity),
+      lat: count(station.lat),
+      lon: count(station.lon),
+    });
   }
   for (const live of status?.data?.stations ?? []) {
     if (live?.station_id === undefined) continue;

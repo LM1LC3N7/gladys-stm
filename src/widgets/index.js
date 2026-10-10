@@ -137,24 +137,61 @@ export function departuresContent(name, departures) {
     return { ttl_seconds: TTL_SECONDS[WIDGET_KEYS.DEPARTURES], components };
   }
 
+  const scheduled = departures.slice(0, BOARD_ROWS).some((departure) => !departure.realtime);
   components.push({
     type: 'value',
     value: next.minutes,
     unit: 'min',
-    label: { en: `Route ${next.route}`, fr: `Ligne ${next.route}` },
+    label: routeLabel(next, 24),
     icon: 'clock',
-    color: SUCCESS,
+    color: next.realtime ? SUCCESS : NEUTRAL,
   });
   components.push({
     type: 'status',
     items: departures.slice(0, BOARD_ROWS).map((departure) => ({
-      label: { en: `Route ${departure.route}`, fr: `Ligne ${departure.route}` },
-      value: formatMinutes(departure.minutes),
-      // A bus more than five minutes late is worth a glance before leaving.
-      color: (departure.delaySeconds ?? 0) > 300 ? WARNING : SUCCESS,
+      label: routeLabel(departure, 40),
+      value: departure.realtime
+        ? formatMinutes(departure.minutes)
+        : formatScheduled(departure.minutes),
+      // Green is a bus the STM tracks, grey the timetable; a tracked bus more
+      // than five minutes late is worth a glance before leaving.
+      color: !departure.realtime
+        ? NEUTRAL
+        : (departure.delaySeconds ?? 0) > 300
+          ? WARNING
+          : SUCCESS,
     })),
   });
+  if (scheduled) {
+    components.push({
+      type: 'text',
+      variant: WIDGET_TEXT_VARIANTS.CAPTION,
+      text: {
+        en: '~ scheduled time. Add an STM key for real time.',
+        fr: '~ horaire prévu. Ajoutez une clé STM pour le temps réel.',
+      },
+    });
+  }
   return { ttl_seconds: TTL_SECONDS[WIDGET_KEYS.DEPARTURES], components };
+}
+
+/**
+ * "Ligne 61 → Est": the route, and where it goes when the source said so (the
+ * timetable does, the real-time feed does not).
+ * @param {{ route: string, headsign?: string }} departure
+ * @param {number} max the budget of the component
+ */
+function routeLabel(departure, max) {
+  const direction = departure.headsign ? ` → ${departure.headsign}` : '';
+  return {
+    en: truncate(`Route ${departure.route}${direction}`, max),
+    fr: truncate(`Ligne ${departure.route}${direction}`, max),
+  };
+}
+
+/** A scheduled countdown, marked "~" like on the STM signs. */
+function formatScheduled(minutes) {
+  return minutes === 0 ? { en: '~ Now', fr: '~ À l’arrêt' } : `~${minutes} min`;
 }
 
 const METRO_COLORS = {

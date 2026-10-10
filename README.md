@@ -3,10 +3,16 @@
 External integration for [Gladys Assistant](https://gladysassistant.com) that
 brings Montréal public transit into your smart home:
 
-- **next STM bus departures** at the stops you choose (real time, GTFS-Realtime);
+- **next STM bus departures**: scheduled times out of the box, real time with
+  a free STM key;
 - **status of the four metro lines** (green, orange, yellow, blue), with the
   STM service messages;
 - **BIXI stations**: bikes, e-bikes and free docks (open GBFS feed, no key).
+
+**Zero configuration to start:** the integration reads the location of the
+house from Gladys and offers the closest bus stops and BIXI stations in the
+Discover tab, named the way people know them ("Notre-Dame / Peel (36 →
+Ouest)"). No account, no code to look up.
 
 Unofficial: not affiliated with the Société de transport de Montréal nor with
 BIXI Montréal.
@@ -21,13 +27,19 @@ User documentation: [français](docs/fr.md) · [English](docs/en.md).
 | Dashboard widgets     | bus departures board, metro status, BIXI station                                                                        |
 | Scene triggers        | bus approaching (1–15 min), metro line disrupted / restored / notice, BIXI station empty / full                         |
 | Scene actions         | read the next buses of a stop, read the status of a metro line                                                          |
-| Configuration buttons | test the STM API key, find a BIXI station by name                                                                       |
+| Configuration buttons | test the STM API key, find a bus stop or a BIXI station by name                                                         |
 
-Requires Gladys **5.1.0** or later. Bus departures and the metro status need a
-free personal key from the
+Requires Gladys **5.1.0** or later.
+
+| Without any account                                 | With a free STM key                          |
+| --------------------------------------------------- | -------------------------------------------- |
+| scheduled bus times (Transitous), BIXI, stop search | real-time bus predictions, metro line status |
+
+The STM key comes from the
 [STM developer portal](https://portail.developpeurs.stm.info/apihub) (quota:
 10,000 requests a day per account; the integration uses about 2,200 with the
-default settings, whatever the number of stops).
+default settings, whatever the number of stops). The user documentation has a
+step-by-step guide.
 
 ## Development
 
@@ -59,6 +71,9 @@ the architecture and the conventions.
 
 ## Data and licences
 
+- Scheduled times, stop names, stop search: [Transitous](https://transitous.org/sources/)
+  (free community service; the integration sends a User-Agent naming it, caches
+  every answer and never reads a timetable more than every two minutes).
 - STM data: [CC BY 4.0](https://www.stm.info/fr/a-propos/developpeurs/condition-dutilisation),
   source: Société de transport de Montréal.
 - BIXI data: public GBFS feed of BIXI Montréal.

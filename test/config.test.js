@@ -6,6 +6,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   DEFAULT_CONFIG,
+  departuresSource,
+  metroEnabled,
   estimatedDailyRequests,
   gladysPollFrequency,
   hasStmApiKey,
@@ -21,6 +23,11 @@ test('an empty configuration gets the defaults and watches the metro only', () =
   assert.equal(config.language, 'fr');
   assert.deepEqual(config.watched, { stops: [], bixiStations: [], metro: true });
   assert.equal(hasStmApiKey(config), false);
+  // Without a key: the timetable for the buses, and no metro (STM API only).
+  assert.equal(departuresSource(config), 'schedule');
+  assert.equal(metroEnabled(config), false);
+  assert.equal(config.nearby_bus_stops, 3);
+  assert.equal(config.nearby_bixi_stations, 2);
 });
 
 test('the stop syntax: code, route filter, custom name', () => {
@@ -79,13 +86,42 @@ test('poll frequencies map onto the values the Gladys scheduler accepts', () => 
 });
 
 test('the daily STM request estimate counts one feed read per interval', () => {
-  assert.equal(estimatedDailyRequests(normalizeConfig({ stops: '1, 2, 3' })), 1440 + 720);
-  assert.equal(estimatedDailyRequests(normalizeConfig({ watch_metro: false })), 0);
+  assert.equal(
+    estimatedDailyRequests(normalizeConfig({ stm_api_key: 'k', stops: '1, 2, 3' })),
+    1440 + 720,
+  );
+  assert.equal(
+    estimatedDailyRequests(normalizeConfig({ stm_api_key: 'k', watch_metro: false })),
+    0,
+  );
+  // The suggested and created stops count too: one feed read serves them all.
+  assert.equal(
+    estimatedDailyRequests(normalizeConfig({ stm_api_key: 'k', watch_metro: false }), {
+      busStops: 4,
+    }),
+    1440,
+  );
+  // Without a key, nothing is read from the STM.
+  assert.equal(estimatedDailyRequests(normalizeConfig({ stops: '1' })), 0);
   // The most aggressive configuration still fits in the 10,000 daily quota.
   const fastest = normalizeConfig({
+    stm_api_key: 'k',
     stops: '1',
     departures_poll_frequency: 30,
     metro_poll_frequency: 30,
   });
   assert.ok(estimatedDailyRequests(fastest) <= 10_000);
+});
+
+test('the departures source: STM with a key, timetable without, nothing when turned off', () => {
+  assert.equal(departuresSource(normalizeConfig({ stm_api_key: 'k' })), 'stm');
+  assert.equal(departuresSource(normalizeConfig({ schedule_without_key: false })), 'none');
+  assert.equal(metroEnabled(normalizeConfig({ stm_api_key: 'k' })), true);
+});
+
+test('the suggestion counts are bounded, 0 turning them off', () => {
+  const config = normalizeConfig({ nearby_bus_stops: '0', nearby_bixi_stations: 99 });
+  assert.equal(config.nearby_bus_stops, 0);
+  assert.equal(config.nearby_bixi_stations, 8);
+  assert.equal(normalizeConfig({ nearby_bus_stops: 'x' }).nearby_bus_stops, 3);
 });

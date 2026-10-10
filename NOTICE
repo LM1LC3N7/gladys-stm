@@ -15,4 +15,7 @@ This product includes software adapted from:
 Data sources (not distributed with this software):
 
   - Société de transport de Montréal open data, CC BY 4.0.
+  - Transitous (https://transitous.org/sources/), community routing service
+    built on the STM timetables and OpenStreetMap (© OpenStreetMap
+    contributors, ODbL).
   - BIXI Montréal public GBFS feed.

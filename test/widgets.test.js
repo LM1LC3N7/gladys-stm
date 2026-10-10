@@ -9,12 +9,13 @@ import assert from 'node:assert/strict';
 import { validateWidgetContent } from '@gladysassistant/integration-sdk';
 import { createFakeGladys } from './helpers/fakeGladys.js';
 import { restoreFetch, stubFetch } from './helpers/stubFetch.js';
-import { bixiRoutes, etatService, interruption } from './helpers/fixtures.js';
+import { bixiRoutes, etatService, interruption, stopTimesPayload } from './helpers/fixtures.js';
 import { encodeFeed } from './helpers/gtfsRealtimeEncoder.js';
 import { normalizeConfig } from '../src/config.js';
 import { clearReadings } from '../src/devices/readings.js';
 import { clearStmCache, TRIP_UPDATES_PATH } from '../src/api/stm.js';
 import { clearBixiCache } from '../src/api/bixi.js';
+import { departuresContent } from '../src/widgets/index.js';
 import { ETAT_SERVICE_PATH } from '../src/api/metro.js';
 import { truncate, WIDGETS } from '../src/widgets/index.js';
 
@@ -120,4 +121,34 @@ test('a slow API gets a loading card rather than a dashboard error', async () =>
 test('truncate', () => {
   assert.equal(truncate('abc', 5), 'abc');
   assert.equal(truncate('abcdef', 5), 'abcd…');
+});
+
+test('a scheduled board is grey, marked "~", and says what a key adds', async () => {
+  stubFetch({
+    '/v5/stoptimes': stopTimesPayload(Date.now(), [
+      { minutes: 5 },
+      { minutes: 20, route: '107', headsign: 'Nord' },
+    ]),
+  });
+  const content = await WIDGETS.departures(createFakeGladys(), {
+    settings: { stop: 'stm-bus-stop:52743' },
+    config: normalizeConfig({ stops: '52743' }),
+  });
+  assertValid(content);
+  const board = content.components.find((component) => component.type === 'status');
+  assert.deepEqual(
+    board.items.map((item) => [item.label.fr, item.color]),
+    [
+      ['Ligne 61 → Est', 'neutral'],
+      ['Ligne 107 → Nord', 'neutral'],
+    ],
+  );
+  assert.match(board.items[0].value, /^~[45] min$/);
+  assert.match(content.components.at(-1).text.fr, /clé STM pour le temps réel/);
+});
+
+test('an empty board says so', () => {
+  const content = departuresContent('Arrêt', []);
+  assertValid(content);
+  assert.match(content.components[1].text.fr, /Aucun passage/);
 });

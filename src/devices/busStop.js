@@ -1,10 +1,15 @@
 // -----------------------------------------------------------------------------
 // Device type: BUS STOP (arrêt d'autobus STM)
 //
-// One device per stop the user watches. Read-only, refreshed by polling at
-// `departures_poll_frequency` (departures are countdowns: they are only useful
-// while fresh). Every watched stop reads the same network feed, read once per
-// interval (see src/api/stm.js).
+// One device per stop the user watches (typed in the configuration, suggested
+// near the house, or created from an earlier suggestion). Read-only, refreshed
+// by polling at `departures_poll_frequency` (departures are countdowns: they
+// are only useful while fresh). Two sources, same board:
+//   - with an STM key, the real-time predictions: every watched stop reads the
+//     same network feed, read once per interval (see src/api/stm.js);
+//   - without one, the timetable from Transitous (src/api/transitous.js),
+//     marked "~" as a scheduled time, and never read faster than every two
+//     minutes.
 //
 // Features, for each of the N next departures (N = `max_departures`):
 //   - "Departure n"        : minutes to wait     (duration sensor)
@@ -24,11 +29,17 @@ import {
   DEVICE_FEATURE_TYPES,
   DEVICE_FEATURE_UNITS,
 } from '@gladysassistant/integration-sdk';
-import { gladysPollFrequency, stopPlatformId } from '../config.js';
+import {
+  departuresSource,
+  gladysPollFrequency,
+  MIN_SCHEDULE_POLL_FREQUENCY,
+  stopPlatformId,
+} from '../config.js';
 import { TEXT_FEATURE_RANGE } from './featureRange.js';
 import { changedStates } from './stateCache.js';
 import { publishDeviceStates } from './publish.js';
-import { fetchDepartures } from '../api/stm.js';
+import { fetchDepartures, StmApiError } from '../api/stm.js';
+import { knownStop, scheduledDepartures } from '../api/transitous.js';
 
 export const DEVICE_TYPE = 'stm-bus-stop';
 
@@ -62,29 +73,54 @@ const LABELS = {
 };
 
 /**
- * One-line board: "24 3 min · 24 11 min · 747 14 min".
- * @param {{ route: string, minutes: number }[]} departures
+ * One-line board: "24 3 min · 24 11 min · 747 14 min". A scheduled time (no
+ * real-time tracking) carries a "~", the convention of the STM signs.
+ * @param {{ route: string, minutes: number, realtime?: boolean }[]} departures
  * @param {string} language
  */
 export function formatSummary(departures, language = 'fr') {
   if (departures.length === 0) {
     return LABELS[language].none;
   }
-  return departures.map((departure) => `${departure.route} ${departure.minutes} min`).join(' · ');
+  return departures
+    .map(
+      (departure) =>
+        `${departure.route} ${departure.realtime === false ? '~' : ''}${departure.minutes} min`,
+    )
+    .join(' · ');
 }
 
 /**
- * Default device name when the user did not give one: the stop code plus the
- * route filter, e.g. "Arrêt STM 51003 (24)".
+ * Device name when the user did not give one: the stop name as people know it
+ * when Transitous told us ("Peel / Notre-Dame"), else the stop code — plus the
+ * route filter, e.g. "Peel / Notre-Dame (24)" or "Arrêt STM 51003 (24)".
  * @param {{ id: string, routes: string[], name: string | null }} stop
  * @param {string} language
  */
-function deviceName(stop, language) {
+export function deviceName(stop, language) {
   if (stop.name) {
     return stop.name;
   }
   const routes = stop.routes.length > 0 ? ` (${stop.routes.join(', ')})` : '';
-  return `${LABELS[language].device} ${stop.id}${routes}`;
+  const known = knownStop(stop.id)?.name;
+  return known ? `${known}${routes}` : `${LABELS[language].device} ${stop.id}${routes}`;
+}
+
+const NO_SOURCE_MESSAGE = {
+  en: 'No STM API key, and scheduled times are turned off: add a key in the configuration.',
+  fr: 'Aucune clé d’API STM, et les horaires prévus sont désactivés : ajoutez une clé dans la configuration.',
+};
+
+/**
+ * The refresh interval of a stop, in seconds: the configured one, but never
+ * faster than every two minutes on the timetable (Transitous asks to stay
+ * light, and a timetable does not move).
+ * @param {ReturnType<import('../config.js').normalizeConfig>} config
+ */
+export function busStopPollSeconds(config) {
+  return departuresSource(config) === 'schedule'
+    ? Math.max(config.departures_poll_frequency, MIN_SCHEDULE_POLL_FREQUENCY)
+    : config.departures_poll_frequency;
 }
 
 /**
@@ -108,7 +144,7 @@ export function createBusStopBlueprint(stop) {
     },
 
     pollIntervalMs(config) {
-      return config.departures_poll_frequency * 1000;
+      return busStopPollSeconds(config) * 1000;
     },
 
     buildDevice(gladys, config) {
@@ -160,14 +196,14 @@ export function createBusStopBlueprint(stop) {
         // Gladys calls onPoll at this interval, in milliseconds, and only
         // accepts the values its own scheduler knows: the configured refresh
         // interval is honored by pollSchedule.js, not by this field.
-        poll_frequency: gladysPollFrequency(config.departures_poll_frequency),
+        poll_frequency: gladysPollFrequency(busStopPollSeconds(config)),
         // `should_poll` is what actually schedules the device: the core only
         // inserts it in its poll scheduler when the flag is set at creation.
         should_poll: true,
         params: [
           { name: 'stop_code', value: stop.id },
           { name: 'routes', value: stop.routes.join(',') },
-          { name: 'source', value: 'api.stm.info' },
+          { name: 'source', value: 'stm' },
         ],
         features,
       };
@@ -179,7 +215,16 @@ export function createBusStopBlueprint(stop) {
      * so the three always agree on what "the next bus" is.
      */
     read(config) {
-      return fetchDepartures(config, stop);
+      switch (departuresSource(config)) {
+        case 'stm':
+          return fetchDepartures(config, stop);
+        case 'schedule':
+          return scheduledDepartures(stop);
+        default:
+          return Promise.reject(
+            new StmApiError('No departure source configured', { userMessage: NO_SOURCE_MESSAGE }),
+          );
+      }
     },
 
     async onPoll(gladys, config) {

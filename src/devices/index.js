@@ -1,9 +1,16 @@
 // -----------------------------------------------------------------------------
 // Device registry.
 //
-// The device list is a function of the configuration, not a static catalog:
-// the user tells the integration which bus stops and BIXI stations to watch,
-// and whether to watch the metro, and one device is built per entry.
+// The device list is not a static catalog. One device is built per entry of
+// three sources, merged by device identity:
+//   1. the configuration: the stops and stations the user typed, and the
+//      metro when it is watched (and an STM key is set);
+//   2. the suggestions: the stops and stations closest to the house
+//      (src/devices/suggestions.js);
+//   3. the devices the user already created: rebuilt from their own params, so
+//      a device keeps refreshing once it stops being suggested, or after the
+//      entry that created it was removed from the configuration — the user
+//      deletes a device in Gladys, not in a text field.
 //
 // Each blueprint (see the three modules of this folder) exposes:
 //   - key                        : short identifier, used in logs and caches
@@ -31,31 +38,80 @@ import { forgetDeviceStates } from './stateCache.js';
 import { getTripUpdates, StmApiError } from '../api/stm.js';
 import { fetchMetroStatus } from '../api/metro.js';
 import { searchStations } from '../api/bixi.js';
-import { estimatedDailyRequests, hasStmApiKey } from '../config.js';
+import { describeStop, formatRoutes, searchStops, TransitousError } from '../api/transitous.js';
+import { estimatedDailyRequests, hasStmApiKey, metroEnabled, parseStopEntry } from '../config.js';
+import { getSuggestions } from './suggestions.js';
 import { publishSceneEvents } from '../scenes/triggers.js';
 
 const logger = createLogger({ name: 'devices' });
 
-/**
- * Build every blueprint described by the configuration.
- * @param {ReturnType<import('../config.js').normalizeConfig>} config
- */
-export function buildBlueprints(config) {
-  const { stops, bixiStations, metro } = config.watched;
-  return [
-    ...(metro ? [createMetroStatusBlueprint()] : []),
-    ...stops.map(createBusStopBlueprint),
-    ...bixiStations.map(createBixiStationBlueprint),
-  ];
+/** The value of a device param, as the SDK lists created devices. */
+function paramValue(device, name) {
+  const param = (device?.params ?? []).find((candidate) => candidate?.name === name);
+  return param?.value === undefined || param?.value === null ? undefined : String(param.value);
 }
 
 /**
- * Build the discovery payload for Gladys (all configured devices).
+ * The entries behind the devices the user created: a bus stop carries its
+ * `stop_code` and `routes` params, a BIXI station its `station_id` (see
+ * `buildDevice` in busStop.js and bixiStation.js). Their name is the one
+ * Gladys holds, so it is left null here.
+ *
+ * @param {object} gladys
+ */
+export function createdEntries(gladys) {
+  const stops = [];
+  const bixiStations = [];
+  for (const device of gladys?.devices ?? []) {
+    const stopCode = paramValue(device, 'stop_code');
+    if (stopCode) {
+      const routes = paramValue(device, 'routes');
+      const stop = parseStopEntry(routes ? `${stopCode}@${routes.split(',').join('|')}` : stopCode);
+      if (stop) stops.push(stop);
+      continue;
+    }
+    const stationId = paramValue(device, 'station_id');
+    if (stationId) {
+      bixiStations.push({ id: stationId, name: null });
+    }
+  }
+  return { stops, bixiStations };
+}
+
+/** Keep the first blueprint of each device: the typed entry wins (its custom name). */
+function uniqueBlueprints(blueprints) {
+  const seen = new Set();
+  return blueprints.filter((blueprint) =>
+    seen.has(blueprint.key) ? false : seen.add(blueprint.key),
+  );
+}
+
+/**
+ * Build every blueprint: configuration, suggestions, created devices.
+ * @param {object} gladys
+ * @param {ReturnType<import('../config.js').normalizeConfig>} config
+ */
+export function buildBlueprints(gladys, config) {
+  const suggested = getSuggestions();
+  const created = createdEntries(gladys);
+  return uniqueBlueprints([
+    ...(metroEnabled(config) ? [createMetroStatusBlueprint()] : []),
+    ...config.watched.stops.map(createBusStopBlueprint),
+    ...suggested.stops.map(createBusStopBlueprint),
+    ...created.stops.map(createBusStopBlueprint),
+    ...config.watched.bixiStations.map(createBixiStationBlueprint),
+    ...suggested.bixiStations.map(createBixiStationBlueprint),
+    ...created.bixiStations.map(createBixiStationBlueprint),
+  ]);
+}
+
+/**
+ * Build the discovery payload for Gladys.
  * @param {object} gladys
  * @param {ReturnType<import('../config.js').normalizeConfig>} config
  */
 export function buildDiscoveredDevices(gladys, config) {
-  return buildBlueprints(config).map((blueprint) => blueprint.buildDevice(gladys, config));
+  return buildBlueprints(gladys, config).map((blueprint) => blueprint.buildDevice(gladys, config));
 }
 
 /**
@@ -65,9 +121,20 @@ export function buildDiscoveredDevices(gladys, config) {
  * @param {ReturnType<import('../config.js').normalizeConfig>} config
  */
 export function findBlueprintByDevice(gladys, device, config) {
-  return buildBlueprints(config).find(
+  return buildBlueprints(gladys, config).find(
     (blueprint) => blueprint.deviceExternalId(gladys) === device.external_id,
   );
+}
+
+/**
+ * How many bus stops are polled: the estimate of the STM requests counts one
+ * feed read per interval as soon as there is one.
+ * @param {object} gladys
+ * @param {ReturnType<import('../config.js').normalizeConfig>} config
+ */
+export function countBusStops(gladys, config) {
+  return buildBlueprints(gladys, config).filter((blueprint) => blueprint.type === BUS_STOP_TYPE)
+    .length;
 }
 
 /**
@@ -209,14 +276,19 @@ export function findSelectedBlueprint(gladys, deviceExternalId, config, type) {
  * @throws {DeviceSelectionError}
  */
 export function metroBlueprint(config) {
-  const blueprint = buildBlueprints(config).find((candidate) => candidate.type === METRO_TYPE);
-  if (!blueprint) {
+  if (!config.watched.metro) {
     throw new DeviceSelectionError({
       en: 'The metro is not watched: turn on “Watch the metro” in the integration configuration.',
       fr: 'Le métro n’est pas surveillé : activez « Surveiller le métro » dans la configuration de l’intégration.',
     });
   }
-  return blueprint;
+  if (!metroEnabled(config)) {
+    throw new DeviceSelectionError({
+      en: 'The metro status needs an STM API key: see the integration documentation, it takes 5 minutes.',
+      fr: 'L’état du métro demande une clé d’API STM : voir la documentation de l’intégration, c’est 5 minutes.',
+    });
+  }
+  return createMetroStatusBlueprint();
 }
 
 /**
@@ -270,7 +342,7 @@ const RAW_ACTIONS = {
         fr: `✖ ${result.label.fr} : ${reason.fr}`,
       };
     });
-    const requests = estimatedDailyRequests(config);
+    const requests = estimatedDailyRequests(config, { busStops: countBusStops(gladys, config) });
     const summary = results.every((result) => result.ok)
       ? {
           en: `STM API OK. This configuration costs about ${requests} requests a day (quota: 10,000).`,
@@ -283,6 +355,34 @@ const RAW_ACTIONS = {
     return {
       en: [summary.en, ...lines.map((line) => line.en)].join('\n'),
       fr: [summary.fr, ...lines.map((line) => line.fr)].join('\n'),
+    };
+  },
+
+  /**
+   * Search a bus stop by name and show the codes to paste, each with where
+   * its routes go: the two sides of a street share a name, not a direction.
+   */
+  async search_stops(gladys, { fields }) {
+    const query = String(fields?.query ?? '').trim();
+    if (query.length < 2) {
+      return { en: 'Type at least 2 characters.', fr: 'Saisissez au moins 2 caractères.' };
+    }
+    const results = (await searchStops(query)).slice(0, 8);
+    if (results.length === 0) {
+      return {
+        en: `No STM bus stop matches "${query}". Try a street corner, e.g. "Sherbrooke Papineau".`,
+        fr: `Aucun arrêt STM ne correspond à « ${query} ». Essayez une intersection, ex. « Sherbrooke Papineau ».`,
+      };
+    }
+    const lines = [];
+    for (const stop of results) {
+      const description = await describeStop(stop.code);
+      const routes = formatRoutes(description);
+      lines.push(`${stop.code} — ${description?.name || stop.name}${routes ? ` (${routes})` : ''}`);
+    }
+    return {
+      en: `Paste a code in "Bus stops" (several: separate with commas):\n${lines.join('\n')}`,
+      fr: `Collez un code dans « Arrêts d'autobus » (plusieurs : séparez par des virgules) :\n${lines.join('\n')}`,
     };
   },
 
@@ -323,6 +423,13 @@ export const ACTIONS = Object.fromEntries(
         if (err instanceof StmApiError && err.userMessage) {
           logger.warn(`Action ${key} failed: ${err.message}`);
           return err.userMessage;
+        }
+        if (err instanceof TransitousError) {
+          logger.warn(`Action ${key} failed: ${err.message}`);
+          return {
+            en: 'The stop directory (Transitous) does not answer right now: try again in a few minutes.',
+            fr: 'L’annuaire des arrêts (Transitous) ne répond pas pour l’instant : réessayez dans quelques minutes.',
+          };
         }
         throw err;
       }

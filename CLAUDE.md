@@ -11,8 +11,16 @@ the official SDK (`@gladysassistant/integration-sdk`), and publishes
 one per watched BIXI station.
 
 Not affiliated with the STM nor with BIXI. Data: STM open data API (personal
-key, `apiKey` header, 10,000 requests a day per account) and the open BIXI GBFS
-feed.
+key, `apiKey` header, 10,000 requests a day per account), the open BIXI GBFS
+feed, and Transitous (keyless: stops near the house, stop search, names,
+scheduled times when there is no STM key).
+
+**Design goal: usable by somebody who is not technical.** Nothing to type to
+start: the house location (`location: true`) gives the suggested stops and
+stations, the STM key is optional, and the connection status line
+(`src/status.js`) always says what to do next. Keep it that way: every new
+setting needs a default that works, and every failure a message that says what
+to do.
 
 ## Commands
 
@@ -39,7 +47,10 @@ src/api/gtfsRealtime.js       minimal GTFS-Realtime decoder (watched stops only)
 src/api/stm.js                STM API client: bus departures, per-interval feed cache, errors
 src/api/metro.js              STM i3 "état du service": metro line statuses
 src/api/bixi.js               BIXI GBFS client, per-cycle cache, station search
-src/devices/index.js          dynamic device registry + manifest actions
+src/api/transitous.js         Transitous: stops near a point, stop search, descriptions, timetable
+src/status.js                 the connection status line: what the user must do next
+src/devices/index.js          device registry (typed + suggested + created) + manifest actions
+src/devices/suggestions.js    the bus stops and BIXI stations closest to the house
 src/devices/busStop.js        one device per watched bus stop
 src/devices/metroStatus.js    the metro status device
 src/devices/bixiStation.js    one device per watched BIXI station
@@ -106,10 +117,20 @@ cards.
   examples and tests (e.g. stop 52743, ÉTS; BIXI station 1).
 - Tests never touch the network: `test/helpers/stubFetch.js` routes `fetch`.
 
+- **Transitous**: ids are `ca-qc-STM_<stop_id>`; bus stops are the 5-digit
+  codes (metro stations are `STATION_Mxxx`, platforms `9999xxx` or 1–68).
+  `/v1/map/stops?min=&max=` (bounding box), `/v1/geocode?text=&type=STOP`,
+  `/v5/stoptimes?stopId=&n=` (scheduled; `realTime` false for the STM when
+  checked). Usage policy: open-source non-commercial, User-Agent with a
+  contact, stay light — keep the caches and the 120 s floor
+  (`MIN_SCHEDULE_POLL_FREQUENCY`).
+- **Created devices** are rebuilt from their params (`stop_code`, `routes`,
+  `station_id`): never rename those params.
+
 ## Roadmap ideas
 
-- Stop names and route headsigns from the static GTFS (`stops.txt` is ~1 MB
-  inside a 43 MB zip: fetch it with HTTP range requests rather than whole).
-- A "search a bus stop" action once the names are available.
+- Ask the Transitous team for an explicit OK before the integration gets many
+  users (their policy asks to be contacted for heavy use).
+- Screenshots in the user documentation (the STM portal needs a login).
 - Other Québec networks reachable with the same decoder: exo and RTL (Chrono
   API), STO Gatineau, Saguenay.

@@ -1,54 +1,100 @@
 # STM Montréal
 
-This integration brings Montréal's **next STM bus departures**, the **metro
-line status** and the **availability of BIXI stations** into Gladys.
+The **next STM buses**, the **metro status** and the **BIXI bikes** near your
+home, in Gladys.
 
-It is not affiliated with the Société de transport de Montréal (STM) nor with
-BIXI Montréal. The data comes from the STM open data (CC BY 4.0 licence,
-source: Société de transport de Montréal) and from the public BIXI GBFS feed.
+This integration is not affiliated with the Société de transport de Montréal
+(STM) nor with BIXI Montréal.
 
-## Requirements
+## Get started in 3 steps
 
-- Gladys Assistant **5.1.0** or later.
-- For buses and the metro: a free, personal **STM API key**.
-- For BIXI: nothing, the feed is open.
+No technical knowledge is needed, and no account to begin with.
 
-## Getting an STM API key
+1. **Check the address of your house in Gladys**: _Settings → Houses_. The
+   house must have a position on the map. The integration uses it to find the
+   stops near you. The position stays in your Gladys.
+2. **Install the integration** from the integration catalog, and accept the
+   access to the house location. Open its configuration page and press
+   **Save**, without filling anything in.
+3. Open the **Discover** tab of the integration. The 3 bus stops and 2 BIXI
+   stations closest to your home are offered there, with their name and the
+   direction of their routes, e.g. "Notre-Dame / Peel (36 → Ouest)". Press
+   **Add** on each one you want.
 
-1. Create an account on the
-   [STM developer portal](https://portail.developpeurs.stm.info/apihub).
-2. Add an application.
-3. Subscribe it to the **GTFS-realtime** API (bus departures) and the **i3**
-   API (service status).
-4. Create a key, then publish it.
-5. Paste the key in the "STM API key" field of the integration configuration.
-   The "shared secret" is not needed.
+That's it. You now get the **scheduled times** of the next buses at each stop,
+and the bikes and free docks of each BIXI station.
 
-The **Test the STM API key** button checks both APIs separately, so it tells
-you which API your application is not subscribed to.
+The message at the top of the configuration page always tells you what to do
+next. For example: "Ready: 3 bus stops and 2 BIXI stations to add. Open the
+Discover tab…".
 
-### Quota
+### Showing the departures on the dashboard
 
-The STM grants **10,000 requests a day per account**, across all your
-applications. The integration reads the bus feed **once per interval, whatever
-the number of stops**. With the default settings it uses about:
+1. Open the dashboard, then press **Edit**.
+2. Add a widget and choose **STM bus departures**.
+3. Choose the stop, then save.
 
-- 1,440 requests a day for buses (one read a minute);
-- 720 requests a day for the metro (one read every 2 minutes).
+The **BIXI station** widget is added the same way. The **STM metro status**
+widget needs an STM key (see below).
 
-The connection status shown in Gladys gives the estimate for your
-configuration. Dashboard widgets reuse the latest reads, so they cost no extra
-quota.
+Scheduled times carry a **~**, as on the STM signs: "~12 min" means "scheduled
+in 12 minutes".
 
-## What to watch
+## Going real time and adding the metro (optional)
 
-### Bus stops
+With a free, personal **STM API key**:
 
-The **stop code** is the five-digit number written on every STM bus stop sign.
-You can also find it in the STM app and on stm.info.
+- the scheduled times become **real-time predictions** (where the buses
+  actually are);
+- the **STM metro** device appears, with the status of the green, orange,
+  yellow and blue lines.
 
-Syntax of the "Bus stops" field: `<code>[@<route>|<route>][:<name>]`. Separate
-stops with commas.
+### Getting the STM API key (5 minutes)
+
+1. Go to the
+   [STM developer portal](https://portail.developpeurs.stm.info/apihub) and
+   **create an account** (email and password). Confirm the email you receive.
+2. Once logged in, **add an application**. The name does not matter, e.g.
+   "Gladys home".
+3. In that application, **subscribe to both APIs**:
+   - **GTFS-realtime**: the real-time bus departures;
+   - **i3**: the metro service status.
+4. **Create a key**, then **publish it**. The portal shows an "API key" and a
+   "shared secret". Only the API key is needed.
+5. In Gladys, open the configuration of the integration. Paste the key in
+   **STM API key**, then press **Save**.
+6. Press **Test the STM API key**. Both lines must show ✔. A ✖ line tells you
+   which API your application is missing.
+7. Go back to the **Discover** tab and add the **STM metro** device.
+
+The labels of the STM portal may differ slightly: when in doubt, the
+[portal FAQ](https://www.stm.info/en/about/developers) describes the same
+steps.
+
+**Quota.** The STM grants 10,000 requests a day per account. With the default
+settings the integration uses about 2,200, **whatever the number of stops**:
+one read of the STM data serves all your stops. The message of the
+configuration page shows the estimate for your setup.
+
+## Watching other stops (work, school…)
+
+For a stop far from home:
+
+1. At the bottom of the configuration page, press **Find a bus stop**. Type a
+   street corner, e.g. "Sherbrooke Papineau".
+2. The answer lists the stops with their code and the direction of their
+   routes, e.g. `52682 — Papineau / Sherbrooke (24 → Est, 45 → Sud)`.
+3. Copy the code (`52682`) in **Bus stops**, save, then add the stop in the
+   **Discover** tab.
+
+The code is also the five-digit number written on every STM bus stop sign.
+
+For BIXI stations, the **Find a BIXI station** button works the same way.
+
+### Going further
+
+The **Bus stops** field accepts several codes separated by commas, a route
+filter after `@` and a name after `:`.
 
 | Entry                  | Meaning                              |
 | ---------------------- | ------------------------------------ |
@@ -57,91 +103,62 @@ stops with commas.
 | `61503@69\|469`        | routes 69 and 469                    |
 | `51003@24:Bus to work` | route 24, displayed as "Bus to work" |
 
-A stop serves only one direction: pick the stop on the side of the street where
-you board.
+## What each device holds
 
-Each stop becomes a device with:
+**Bus stop:**
 
-- **Next departure**, **Departure 2**…: the minutes to wait. The value 999
-  means no departure is scheduled.
+- **Next departure**, **Departure 2**…: the minutes to wait. 999 means no
+  departure is scheduled.
 - **Next departure route**…: the route number.
-- **Next departures**: a summary, e.g. `24 3 min · 24 11 min · 747 14 min`.
+- **Next departures**: a summary, e.g. `24 3 min · 747 14 min`.
 
-Set how many departures are exposed with "Departures per stop" (1 to 5).
+**STM metro** (with a key): for each line, a **status** (`Normal`,
+`Disrupted`, `Notice` or `Unknown`) and the STM **message**. The STM publishes
+no real-time train times: only the line status is available.
 
-### Metro
-
-The **Watch the metro** option (on by default) creates an "STM metro" device.
-For each of the green, orange, yellow and blue lines, it exposes:
-
-- **status**: `Normal`, `Disrupted`, `Notice` or `Unknown`;
-- **message**: the STM message, e.g. "Normal métro service" or the text of the
-  disruption.
-
-The metro has no real-time predictions in the STM open data. The integration
-therefore gives the line status only, not train times.
-
-### BIXI stations
-
-Enter the station ids, with an optional name after `:`, e.g.
-`1, 42:Station at home`. The **Find a BIXI station** button looks up an id from
-the station name.
-
-Each station becomes a device with:
-
-- **Bikes**: the number of bikes available, e-bikes included;
-- **Electric bikes**;
-- **Free docks**;
-- **Status**.
-
-## Dashboard
-
-Three widgets are available:
-
-| Widget             | Content                                                                |
-| ------------------ | ---------------------------------------------------------------------- |
-| STM bus departures | the next departure and the list of the following ones                  |
-| STM metro status   | the 4 lines in color, and the message of any line not running normally |
-| BIXI station       | bikes, e-bikes, docks, fill gauge, 24-hour curve                       |
+**BIXI station:** the bikes (e-bikes included), the e-bikes, the free docks
+and the state of the station.
 
 ## Scenes
 
 **Triggers:**
 
-- **STM bus approaching**: a bus goes under a threshold of 1, 2, 3, 5, 10 or 15
-  minutes. A route filter is available. Each bus is followed from one read to
-  the next, so the next bus taking its place in the list does not fire the
-  scene by mistake.
+- **STM bus approaching**: a bus gets under 1, 2, 3, 5, 10 or 15 minutes.
+  Example: "when the 24 is 5 minutes away, turn the hall light on".
 - **STM metro status changed**: a line is disrupted, gets back to normal, or
-  receives a notice.
-- **BIXI station changed**: the station runs out of bikes or docks, gets some
-  back, or changes service.
-
-Nothing fires on the first read after the integration starts.
+  receives a notice. Example: "if the orange line is disrupted, send me a
+  message".
+- **BIXI station changed**: the station runs out of bikes or docks, or gets
+  some back.
 
 **Actions:**
 
-- **Read the next STM buses**: returns the route, the minutes, the following
-  departure and the summary. For example: "Your 24 comes in {{minutes}}
-  minutes".
-- **Read an STM metro line status**: returns the status, the message and
+- **Read the next STM buses**: e.g. a message every morning "Your 24 comes in
+  {{minutes}} minutes".
+- **Read an STM metro line status**: returns the status, the STM message and
   `normal` (true or false).
 
 ## Troubleshooting
 
-- **Nothing in the Discovery screen**: check the "Bus stops" and "BIXI
-  stations" fields. The connection status lists what is being watched.
-- **"The STM refused the API key"**: check the key, then check that the
-  application is subscribed to both APIs on the portal.
-- **"Quota used up"**: raise the refresh intervals, or check that no other
-  application uses the same account.
-- **A stop stays at 999**: either no bus is scheduled (at night), or the stop
-  code or the route filter is wrong.
+| Message or symptom                                | What to do                                                                                             |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| "set the address of your house"                   | _Settings → Houses_: place the house on the map, then save the configuration of the integration again. |
+| "Gladys did not share the location of your house" | Reinstall the integration and accept the location access, or type stop codes.                          |
+| Nothing in the Discover tab                       | Read the message of the configuration page: it says what is missing.                                   |
+| "The STM refused the API key"                     | Check the key, and that the application is subscribed to both APIs (GTFS-realtime and i3).             |
+| "Quota used up"                                   | Raise the intervals (Advanced section), or check no other application uses the same STM account.       |
+| A stop stays at 999                               | No bus scheduled (at night), or a route filter matching no route of the stop.                          |
 
-## Data and licences
+## Privacy, data and licences
 
-- STM data:
+- The house location is only used to look the nearby stops up. Only a box of
+  a few hundred meters around the house is sent to Transitous. Nothing is sent
+  anywhere else.
+- Scheduled times, stop names and search:
+  [Transitous](https://transitous.org/sources/), a free community service,
+  from the STM data.
+- Real time and metro status: STM open data,
   [CC BY 4.0](https://www.stm.info/en/about/developers) licence, source:
   Société de transport de Montréal.
-- BIXI data: public GBFS feed of BIXI Montréal.
+- Bikes: public GBFS feed of BIXI Montréal.
 - Integration code: Apache 2.0 licence.

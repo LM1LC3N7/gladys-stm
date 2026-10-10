@@ -21,9 +21,18 @@ export const DEFAULT_CONFIG = {
   stm_api_key: '',
 
   // --- What to watch --------------------------------------------------------
+  // How many of the bus stops and BIXI stations closest to the house are
+  // proposed in the Discovery screen (src/devices/suggestions.js). 0 turns the
+  // suggestion off.
+  nearby_bus_stops: 3,
+  nearby_bixi_stations: 2,
   stops: '',
   watch_metro: true,
   bixi_stations: '',
+  // Without an STM key, show the scheduled departures (Transitous) rather than
+  // nothing: the integration works right after install, and the key turns the
+  // schedule into real-time predictions.
+  schedule_without_key: true,
 
   // --- Refresh intervals, in seconds ---------------------------------------
   // Gladys drives the refresh: each device is published with a
@@ -44,6 +53,10 @@ export const DEFAULT_CONFIG = {
   max_departures: 3,
   language: 'fr',
 };
+
+// The scheduled departures come from Transitous, a free community service:
+// a timetable does not move, and its usage policy asks to stay light.
+export const MIN_SCHEDULE_POLL_FREQUENCY = 120;
 
 // Below 30 s the STM feed returns the same payload anyway, and every read
 // counts against the user's daily quota; above one hour a "real-time" sensor
@@ -89,6 +102,22 @@ export function normalizePollFrequency(value, fallback) {
     return fallback;
   }
   return Math.min(MAX_POLL_FREQUENCY, Math.max(MIN_POLL_FREQUENCY, Math.round(parsed)));
+}
+
+/** The most suggestions of one kind: beyond that, the Discovery screen is a list to read. */
+export const MAX_NEARBY = 8;
+
+/**
+ * A count of suggestions, bounded to 0..MAX_NEARBY.
+ * @param {unknown} value
+ * @param {number} fallback
+ */
+function normalizeCount(value, fallback) {
+  if (value === undefined || value === null || value === '') {
+    return fallback;
+  }
+  const parsed = Math.round(Number(value));
+  return Number.isFinite(parsed) ? Math.min(MAX_NEARBY, Math.max(0, parsed)) : fallback;
 }
 
 /**
@@ -205,6 +234,15 @@ export function normalizeConfig(raw = {}) {
     ...raw,
     stm_api_key: String(raw.stm_api_key ?? '').trim(),
     watch_metro: normalizeBoolean(raw.watch_metro, DEFAULT_CONFIG.watch_metro),
+    schedule_without_key: normalizeBoolean(
+      raw.schedule_without_key,
+      DEFAULT_CONFIG.schedule_without_key,
+    ),
+    nearby_bus_stops: normalizeCount(raw.nearby_bus_stops, DEFAULT_CONFIG.nearby_bus_stops),
+    nearby_bixi_stations: normalizeCount(
+      raw.nearby_bixi_stations,
+      DEFAULT_CONFIG.nearby_bixi_stations,
+    ),
     departures_poll_frequency: normalizePollFrequency(
       raw.departures_poll_frequency,
       DEFAULT_CONFIG.departures_poll_frequency,
@@ -243,15 +281,38 @@ export function hasStmApiKey(config) {
 }
 
 /**
+ * Where the bus departures come from: the STM real-time feed with a key, the
+ * Transitous timetable without one (unless the user turned that off).
+ * @param {ReturnType<typeof normalizeConfig>} config
+ * @returns {'stm' | 'schedule' | 'none'}
+ */
+export function departuresSource(config) {
+  if (hasStmApiKey(config)) {
+    return 'stm';
+  }
+  return config.schedule_without_key ? 'schedule' : 'none';
+}
+
+/** Whether the metro status can be read: it only exists in the STM API. */
+export function metroEnabled(config) {
+  return config.watched.metro && hasStmApiKey(config);
+}
+
+/**
  * The number of STM requests a day the configuration costs, for the
  * connection status: the quota is per account, and the user may run other
- * applications on the same key.
+ * applications on the same key. `busStops` counts the stops actually polled
+ * (the suggested and created ones included), not only the typed ones.
  * @param {ReturnType<typeof normalizeConfig>} config
+ * @param {{ busStops?: number }} [options]
  */
-export function estimatedDailyRequests(config) {
+export function estimatedDailyRequests(config, { busStops = config.watched.stops.length } = {}) {
   const day = 86_400;
   let requests = 0;
-  if (config.watched.stops.length > 0) {
+  if (!hasStmApiKey(config)) {
+    return 0;
+  }
+  if (busStops > 0) {
     // One read of the network feed serves every watched stop.
     requests += Math.ceil(day / config.departures_poll_frequency);
   }

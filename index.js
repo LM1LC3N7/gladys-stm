@@ -16,7 +16,9 @@
 // -----------------------------------------------------------------------------
 
 import { GladysIntegration, logger } from '@gladysassistant/integration-sdk';
-import { estimatedDailyRequests, hasStmApiKey, normalizeConfig } from './src/config.js';
+import { normalizeConfig } from './src/config.js';
+import { describeStatus } from './src/status.js';
+import { refreshSuggestions } from './src/devices/suggestions.js';
 import {
   ACTIONS,
   buildDiscoveredDevices,
@@ -40,9 +42,13 @@ const gladys = new GladysIntegration();
 let config = normalizeConfig();
 
 // --- Discovery: Gladys asks for the list of devices --------------------------
+// A scan is the user asking "what is there?": look around the house again
+// before answering.
 gladys.onScanRequest(async () => {
-  logger.info('onScanRequest -> publishing the configured stops, metro and stations');
+  logger.info('onScanRequest -> looking around the house, then publishing the devices');
+  await refreshSuggestions(gladys, config);
   await publishDevices();
+  await reportConnectionStatus();
 });
 
 // --- Polling: Gladys asks to refresh a device --------------------------------
@@ -65,8 +71,16 @@ const refreshAddedDevice = (event) => async (device) => {
     logger.warn(`Reading ${device?.external_id} after it was ${event} failed: ${err.message}`);
   }
 };
-gladys.onDeviceCreated(refreshAddedDevice('created'));
-gladys.onDeviceUpdated(refreshAddedDevice('updated'));
+// The status line counts the devices still waiting in the Discovery screen:
+// it changes with every device the user adds.
+const afterDeviceChange = (event) => async (device) => {
+  await refreshAddedDevice(event)(device);
+  await reportConnectionStatus().catch((err) =>
+    logger.warn(`Connection status not updated: ${err.message}`),
+  );
+};
+gladys.onDeviceCreated(afterDeviceChange('created'));
+gladys.onDeviceUpdated(afterDeviceChange('updated'));
 
 // --- Manifest actions: buttons in the Configuration screen -------------------
 for (const [actionKey, handler] of Object.entries(ACTIONS)) {
@@ -100,6 +114,8 @@ gladys.onConfigUpdated(async (newConfig) => {
   clearStateCache();
   clearPublishReports();
   clearSceneMemory();
+  // The house, the number of suggestions or the key (names) may have changed.
+  await refreshSuggestions(gladys, config);
   await publishDevices();
   await reportConnectionStatus();
   startRefreshLoop(gladys, () => config);
@@ -121,7 +137,9 @@ gladys.on('connected', async () => {
     // must not leave the existing devices without anything refreshing them.
     startRefreshLoop(gladys, () => config);
 
-    // 3) (Re)publish all configured devices.
+    // 3) Look the stops and stations near the house up, and (re)publish every
+    // device: typed, suggested, and already created.
+    await refreshSuggestions(gladys, config);
     await publishDevices();
 
     // 4) Report the application-level status, shown in the Configuration
@@ -156,56 +174,13 @@ async function publishDevices() {
 }
 
 /**
- * A short bilingual inventory of what the configuration asks for, shown next
- * to the connection status: how the user checks that the entry they just typed
- * was understood, without opening the container logs.
- */
-function describeWatchList({ stops, bixiStations, metro }) {
-  const parts = [
-    { count: stops.length, en: 'bus stop', fr: 'arrêt' },
-    { count: bixiStations.length, en: 'BIXI station', fr: 'station BIXI' },
-  ].filter((part) => part.count > 0);
-  const plural = (part, language) => `${part.count} ${part[language]}${part.count > 1 ? 's' : ''}`;
-  const en = parts.map((part) => plural(part, 'en'));
-  const fr = parts.map((part) => plural(part, 'fr'));
-  if (metro) {
-    en.unshift('the metro');
-    fr.unshift('le métro');
-  }
-  return { en: en.join(', '), fr: fr.join(', ') };
-}
-
-/**
- * Tell Gladys whether the integration is actually able to do its job. BIXI
- * needs no key: an integration watching only BIXI stations is fully
- * operational without one.
+ * Tell Gladys what the integration is doing and, above all, what the user has
+ * to do next (see src/status.js): for a non-technical user, this line is the
+ * user interface.
  */
 async function reportConnectionStatus() {
-  const { stops, bixiStations, metro } = config.watched;
-  const needsKey = stops.length > 0 || metro;
-
-  if (needsKey && !hasStmApiKey(config)) {
-    await gladys.setConnectionStatus(false, {
-      en: 'Bus stops and the metro status need an STM API key: create one on the STM developer portal.',
-      fr: 'Les arrêts et l’état du métro nécessitent une clé d’API STM : créez-la sur le portail développeurs de la STM.',
-    });
-    return;
-  }
-
-  if (stops.length + bixiStations.length === 0 && !metro) {
-    await gladys.setConnectionStatus(false, {
-      en: 'Nothing to watch yet: add a bus stop or a BIXI station, or turn on the metro.',
-      fr: 'Rien à surveiller : ajoutez un arrêt ou une station BIXI, ou activez le métro.',
-    });
-    return;
-  }
-
-  const watched = describeWatchList(config.watched);
-  const requests = estimatedDailyRequests(config);
-  await gladys.setConnectionStatus(true, {
-    en: `Connected. Watching ${watched.en} (about ${requests} STM requests a day).`,
-    fr: `Connecté. Surveille ${watched.fr} (environ ${requests} requêtes STM par jour).`,
-  });
+  const { connected, message } = describeStatus(gladys, config);
+  await gladys.setConnectionStatus(connected, message);
 }
 
 // --- Safety net for a forgotten promise --------------------------------------

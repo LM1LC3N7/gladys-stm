@@ -29,6 +29,8 @@ test('a station joins its information and its live counts, flags read as 0/1', a
     id: '1',
     name: 'Drummond / de Maisonneuve',
     capacity: 23,
+    lat: 45.4996545,
+    lon: -73.5763353,
     bikes: 8,
     electricBikes: 2,
     docks: 15,

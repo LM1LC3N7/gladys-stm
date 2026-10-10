@@ -27,6 +27,9 @@ import { clearSceneMemory } from '../src/scenes/triggers.js';
 import { clearStmCache, TRIP_UPDATES_PATH } from '../src/api/stm.js';
 import { clearBixiCache } from '../src/api/bixi.js';
 import { ETAT_SERVICE_PATH } from '../src/api/metro.js';
+import { clearTransitousCache } from '../src/api/transitous.js';
+import { clearSuggestions } from '../src/devices/suggestions.js';
+import { GEOCODE, stopTimesPayload } from './helpers/fixtures.js';
 
 const config = normalizeConfig({
   stm_api_key: 'k',
@@ -66,6 +69,8 @@ beforeEach(() => {
   clearSceneMemory();
   clearStmCache();
   clearBixiCache();
+  clearTransitousCache();
+  clearSuggestions();
 });
 afterEach(() => restoreFetch());
 
@@ -184,7 +189,10 @@ test('a device removed from the configuration is ignored', async () => {
 });
 
 test('the metro is not built when it is not watched', () => {
-  const blueprints = buildBlueprints(normalizeConfig({ watch_metro: false, stops: '1' }));
+  const blueprints = buildBlueprints(
+    createFakeGladys(),
+    normalizeConfig({ watch_metro: false, stops: '1' }),
+  );
   assert.deepEqual(
     blueprints.map((blueprint) => blueprint.type),
     ['stm-bus-stop'],
@@ -233,4 +241,84 @@ test('search_bixi_stations lists the ids to paste', async () => {
     config,
   });
   assert.match(tooShort.en, /at least 2/);
+});
+
+// --- 0.2.0: created devices, timetable without a key, stop search ------------
+
+test('a created device keeps refreshing once it is neither typed nor suggested', async () => {
+  stubFetch(routes());
+  const gladys = createFakeGladys();
+  const empty = normalizeConfig({ stm_api_key: 'k', watch_metro: false });
+  // What Gladys lists for a stop and a station the user added earlier.
+  gladys.devices = [
+    {
+      external_id: 'stm-bus-stop:52743@24',
+      name: 'Bus du travail',
+      params: [
+        { name: 'stop_code', value: '52743' },
+        { name: 'routes', value: '24' },
+      ],
+    },
+    { external_id: 'bixi-station:1', name: 'BIXI', params: [{ name: 'station_id', value: '1' }] },
+  ];
+  assert.deepEqual(
+    buildDiscoveredDevices(gladys, empty).map((device) => device.external_id),
+    ['stm-bus-stop:52743@24', 'bixi-station:1'],
+  );
+  await pollDevice(gladys, { external_id: 'stm-bus-stop:52743@24' }, empty);
+  assert.ok(gladys.published.some((state) => state.featureExternalId.endsWith(':departure_1')));
+});
+
+test('without a key, a stop shows the timetable, marked as scheduled, every 2 minutes at most', async () => {
+  const calls = stubFetch({
+    '/v5/stoptimes': stopTimesPayload(Date.now(), [{ minutes: 4 }, { minutes: 12, route: '107' }]),
+  });
+  const gladys = createFakeGladys();
+  const noKey = normalizeConfig({ stops: '52743', max_departures: 2 });
+
+  const [stop] = buildDiscoveredDevices(gladys, noKey);
+  assert.equal(stop.poll_frequency, 60_000);
+  assert.equal(buildBlueprints(gladys, noKey)[0].pollIntervalMs(noKey), 120_000);
+
+  await pollDevice(gladys, { external_id: 'stm-bus-stop:52743' }, noKey);
+  const summary = gladys.published.find((state) => state.featureExternalId.endsWith(':departures'));
+  assert.match(summary.text, /^61 ~[34] min · 107 ~1[12] min$/);
+  assert.ok(calls.every((call) => !call.url.includes('api.stm.info')));
+});
+
+test('without a key the metro is not built, and the timetable can be turned off', async () => {
+  const gladys = createFakeGladys();
+  assert.deepEqual(
+    buildBlueprints(gladys, normalizeConfig({ stops: '1' })).map((blueprint) => blueprint.type),
+    ['stm-bus-stop'],
+  );
+  const off = normalizeConfig({ stops: '52743', schedule_without_key: false });
+  const [blueprint] = buildBlueprints(gladys, off);
+  await assert.rejects(blueprint.read(off), (err) => /horaires prévus/.test(err.userMessage.fr));
+});
+
+test('search_stops lists the codes with the directions of their routes', async () => {
+  stubFetch({
+    '/v1/geocode': GEOCODE,
+    '/v5/stoptimes': stopTimesPayload(
+      Date.now(),
+      [{ minutes: 3, route: '45', headsign: 'Nord' }],
+      'Papineau / Sherbrooke',
+    ),
+  });
+  const message = await ACTIONS.search_stops(createFakeGladys(), {
+    fields: { query: 'sherbrooke papineau' },
+    config,
+  });
+  assert.match(message.fr, /^Collez un code dans « Arrêts d'autobus »/);
+  assert.match(message.fr, /52682 — Papineau \/ Sherbrooke \(45 → Nord\)/);
+});
+
+test('search_stops explains an unavailable directory instead of failing', async () => {
+  stubFetch({ '/v1/geocode': { status: 503, body: '' } });
+  const message = await ACTIONS.search_stops(createFakeGladys(), {
+    fields: { query: 'peel' },
+    config,
+  });
+  assert.match(message.en, /does not answer right now/);
 });

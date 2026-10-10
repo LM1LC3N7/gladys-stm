@@ -25,6 +25,18 @@ export function createFakeGladys() {
     transports,
     connectionStatuses,
     sceneEvents,
+    // What `getHouses` answers: one located house by default (a Montréal
+    // landmark, never somebody's home); a test sets `houses` to an Error to
+    // play the 403 of a manifest without `location: true`.
+    houses: [
+      { id: 'h', name: 'Maison', selector: 'maison', latitude: 45.4954, longitude: -73.5627 },
+    ],
+
+    async getHouses() {
+      if (this.houses instanceof Error) throw this.houses;
+      return this.houses;
+    },
+
     // The SDK resynchronizes this list on every connection and keeps it up to
     // date with the device-created/updated/deleted events; tests fill it in
     // with the devices they pretend the user created.

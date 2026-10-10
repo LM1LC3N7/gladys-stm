@@ -19,4 +19,13 @@ the notes of the version's GitHub Release.
 - Dashboard widgets: bus departures, metro status, BIXI station.
 - Scene triggers: bus approaching, metro status changed, BIXI station changed.
 - Scene actions: read the next buses of a stop, read a metro line status.
-- Configuration actions: test the STM API key, find a BIXI station.
+- Configuration actions: test the STM API key, find a bus stop, find a BIXI
+  station.
+- Works without any account: the bus stops and BIXI stations closest to the
+  house (Gladys house location) are offered in the Discover tab, named with
+  their street corner and the direction of their routes.
+- Without an STM key, the scheduled bus times from Transitous, marked "~"; the
+  key adds real time and the metro status.
+- The connection status line tells what to do next (locate the house, add the
+  devices, what a key would add).
+- A step-by-step guide to get the STM key in the user documentation.
