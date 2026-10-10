@@ -6,8 +6,8 @@
     "en": "Next STM bus departures, metro line status and BIXI stations in Montréal.",
     "fr": "Prochains passages d'autobus STM, état du métro et stations BIXI à Montréal."
   },
-  "version": "0.2.0",
-  "docker_image": "ghcr.io/lm1lc3n7/gladys-stm:0.2.0",
+  "version": "0.2.1",
+  "docker_image": "ghcr.io/lm1lc3n7/gladys-stm:0.2.1",
   "gladys_version": ">=5.1.0",
   "cover_image": "https://raw.githubusercontent.com/LM1LC3N7/gladys-stm/main/cover.png",
   "categories": ["services"],
