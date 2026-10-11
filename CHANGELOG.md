@@ -10,6 +10,8 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-10-11
+
 ### Fixed
 
 - With an STM key, the bus stops added from the Discover tab (suggested near
@@ -54,6 +56,7 @@ the notes of the version's GitHub Release.
   devices, what a key would add).
 - A step-by-step guide to get the STM key in the user documentation.
 
-[Unreleased]: https://github.com/LM1LC3N7/gladys-stm/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/LM1LC3N7/gladys-stm/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/LM1LC3N7/gladys-stm/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/LM1LC3N7/gladys-stm/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/LM1LC3N7/gladys-stm/releases/tag/v0.2.0
