@@ -270,7 +270,10 @@ test('a created device keeps refreshing once it is neither typed nor suggested',
     ['stm-bus-stop:52743@24', 'bixi-station:1'],
   );
   await pollDevice(gladys, { external_id: 'stm-bus-stop:52743@24' }, empty);
-  assert.ok(gladys.published.some((state) => state.featureExternalId.endsWith(':departure_1')));
+  // Not in the configuration, yet decoded: the bus of the feed is on its
+  // board (0.2.1 decoded the typed stops only, and showed it empty).
+  const first = gladys.published.find((state) => state.featureExternalId.endsWith(':departure_1'));
+  assert.equal(first.state, 3);
 });
 
 test('without a key, a stop shows the timetable, marked as scheduled, every 2 minutes at most', async () => {

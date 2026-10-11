@@ -35,7 +35,7 @@ import { createBixiStationBlueprint, DEVICE_TYPE as BIXI_TYPE } from './bixiStat
 import { dueForRead, forgetRead, readFailed } from './pollSchedule.js';
 import { recordReading } from './readings.js';
 import { forgetDeviceStates } from './stateCache.js';
-import { getTripUpdates, StmApiError } from '../api/stm.js';
+import { getTripUpdates, setPolledStops, StmApiError } from '../api/stm.js';
 import { fetchMetroStatus } from '../api/metro.js';
 import { searchStations } from '../api/bixi.js';
 import { describeStop, formatRoutes, searchStops, TransitousError } from '../api/transitous.js';
@@ -94,7 +94,7 @@ function uniqueBlueprints(blueprints) {
 export function buildBlueprints(gladys, config) {
   const suggested = getSuggestions();
   const created = createdEntries(gladys);
-  return uniqueBlueprints([
+  const blueprints = uniqueBlueprints([
     ...(metroEnabled(config) ? [createMetroStatusBlueprint()] : []),
     ...config.watched.stops.map(createBusStopBlueprint),
     ...suggested.stops.map(createBusStopBlueprint),
@@ -103,6 +103,12 @@ export function buildBlueprints(gladys, config) {
     ...suggested.bixiStations.map(createBixiStationBlueprint),
     ...created.bixiStations.map(createBixiStationBlueprint),
   ]);
+  // The real-time decoder keeps the stop time updates of the polled stops
+  // only: all of them, not only the typed ones.
+  setPolledStops(
+    blueprints.filter((blueprint) => blueprint.type === BUS_STOP_TYPE).map((b) => b.stop),
+  );
+  return blueprints;
 }
 
 /**

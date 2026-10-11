@@ -10,6 +10,12 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+### Fixed
+
+- With an STM key, the bus stops added from the Discover tab (suggested near
+  the house) showed no departure: the real-time feed was only decoded for the
+  stops typed in the configuration. Every stop is decoded now.
+
 ## [0.2.1] - 2026-10-10
 
 ### Changed

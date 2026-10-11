@@ -136,11 +136,31 @@ let feedCache = null;
 let feedInFlight = null;
 let staleFeedReported = false;
 
+/**
+ * Every stop the integration polls: the typed ones, but also the suggested
+ * ones and the devices created from a suggestion, which the configuration
+ * does not list. The decoder keeps the stop time updates of these stops only,
+ * so the device registry hands them over (src/devices/index.js).
+ * @type {{ id: string }[]}
+ */
+let polledStops = [];
+
+/** @param {{ id: string }[]} stops every bus stop the devices poll */
+export function setPolledStops(stops) {
+  polledStops = stops;
+}
+
+/** The stop ids the feed is decoded for: the typed and the polled stops. */
+function watchedStopIds(config) {
+  return [...new Set([...config.watched.stops, ...polledStops].map((stop) => stop.id))].sort();
+}
+
 /** Forget the cached feed (configuration change, tests). */
 export function clearStmCache() {
   feedCache = null;
   feedInFlight = null;
   staleFeedReported = false;
+  polledStops = [];
 }
 
 /**
@@ -149,8 +169,7 @@ export function clearStmCache() {
  * @param {ReturnType<import('../config.js').normalizeConfig>} config
  */
 function cacheKey(config) {
-  const ids = [...new Set(config.watched.stops.map((stop) => stop.id))].sort();
-  return `${config.stm_api_key}\u0000${ids.join(',')}`;
+  return `${config.stm_api_key}\u0000${watchedStopIds(config).join(',')}`;
 }
 
 /**
@@ -160,7 +179,7 @@ function cacheKey(config) {
 async function readFeed(config) {
   const response = await stmRequest(config, TRIP_UPDATES_PATH, 'application/x-protobuf');
   const buffer = new Uint8Array(await response.arrayBuffer());
-  const stopIds = config.watched.stops.map((stop) => stop.id);
+  const stopIds = watchedStopIds(config);
   const decoded = decodeTripUpdates(buffer, stopIds);
   logger.debug(
     `TripUpdates: ${buffer.length} bytes, ${decoded.stopTimes.length} stop time(s) ` +
