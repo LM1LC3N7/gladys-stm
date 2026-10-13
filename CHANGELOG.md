@@ -10,6 +10,8 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-10-13
+
 ### Changed
 
 - Shared tooling of the LM1LC3N7 Gladys integrations: CI on Node 22 and 24 with `npm audit`, Release workflow driven by this changelog, GitHub Releases from its sections, grouped Dependabot updates.
@@ -61,7 +63,8 @@ the notes of the version's GitHub Release.
   devices, what a key would add).
 - A step-by-step guide to get the STM key in the user documentation.
 
-[Unreleased]: https://github.com/LM1LC3N7/gladys-stm/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/LM1LC3N7/gladys-stm/compare/v0.2.3...HEAD
+[0.2.3]: https://github.com/LM1LC3N7/gladys-stm/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/LM1LC3N7/gladys-stm/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/LM1LC3N7/gladys-stm/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/LM1LC3N7/gladys-stm/releases/tag/v0.2.0
