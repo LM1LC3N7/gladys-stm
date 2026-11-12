@@ -29,7 +29,7 @@ User documentation: [français](docs/fr.md) · [English](docs/en.md).
 | Scene actions         | read the next buses of a stop, read the status of a metro line                                                          |
 | Configuration buttons | test the STM API key, find a bus stop or a BIXI station by name                                                         |
 
-Requires Gladys **5.1.0** or later.
+Requires Gladys **5.3.0** or later.
 
 | Without any account                                 | With a free STM key                          |
 | --------------------------------------------------- | -------------------------------------------- |
